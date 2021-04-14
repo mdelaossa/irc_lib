@@ -3,21 +3,17 @@ use irc_lib;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = irc_lib::Client::new("irc.subluminal.net:6667");
     connection.connect()?;
-    let mut buff = [0; 512];
 
     let mut negotiator = irc_lib::connection::negotiator::Negotiator::new();
 
     loop {
-        match connection.read(&mut buff) {
-        Ok(size) => {
-            if size == 0 {
-                continue;
-            }
-            println!("{:?}", std::str::from_utf8(&buff[..size])?);
+        match connection.read() {
+        Ok(message) => {
+            println!("{:?}", std::str::from_utf8(&message.text[..message.size])?);
 
-            if std::str::from_utf8(&buff[0..size])?.contains("PING") {
+            if message.to_utf8()?.contains("PING") {
                 connection.send_message(b"PONG")?;
-            } else if std::str::from_utf8(&buff[0..size])?.contains("VERSION") {
+            } else if message.to_utf8()?.contains("VERSION") {
                 connection.send_message(b"VERSION 123")?;
             } else if let Some(message) = negotiator.next() {
                 connection.send_message(message.as_bytes())?;

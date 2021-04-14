@@ -3,8 +3,11 @@ pub mod negotiator;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-pub struct Connection {
-    socket: Option<TcpStream>
+use super::message::IRCMessage;
+
+pub(crate) struct Connection {
+    socket: Option<TcpStream>,
+    buffer: super::RawIRCMessage
 }
 
 impl Connection {
@@ -12,13 +15,14 @@ impl Connection {
         std::io::Error::new(std::io::ErrorKind::NotConnected, "Not Connected")
     }
 
-    pub fn new() -> Connection {
+    pub(crate) fn new() -> Connection {
         Connection {
-            socket: None
+            socket: None,
+            buffer: [0; 512]
         }
     }
 
-    pub fn connect(&mut self, address: &str) -> Result<(), std::io::Error> {
+    pub(crate) fn connect(&mut self, address: &str) -> Result<(), std::io::Error> {
         match TcpStream::connect(address) {
             Ok(stream) => {
                 self.socket = Some(stream);
@@ -31,7 +35,7 @@ impl Connection {
         }
     }
 
-    pub fn send_message(&mut self, message: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn send_message(&mut self, message: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         match &mut self.socket {
             Some(stream) => {
                 let message = &[message, b"\r\n"].concat();
@@ -43,9 +47,17 @@ impl Connection {
         }
     }
 
-    pub fn read(&mut self, buff: &mut [u8]) -> Result<usize, std::io::Error>{
+    pub(crate) fn read(&mut self) -> Result<IRCMessage, std::io::Error>{
         match &mut self.socket {
-            Some(stream) => stream.read(buff),
+            Some(stream) => {
+                // Get rid of any old messages in the buffer
+                self.buffer = [0;512];
+                let size = stream.read(&mut self.buffer)?;
+                Ok(IRCMessage{
+                    size: size,
+                    text: &self.buffer
+                })
+            },
             _ => Err(Connection::not_connected())
         }
     }
