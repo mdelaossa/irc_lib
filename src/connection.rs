@@ -3,11 +3,11 @@ pub mod negotiator;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-use super::message::IRCMessage;
+use super::message::IrcMessage;
 
 pub(crate) struct Connection {
     socket: Option<TcpStream>,
-    buffer: super::RawIRCMessage
+    buffer: super::RawIrcMessage
 }
 
 impl Connection {
@@ -26,11 +26,11 @@ impl Connection {
         match TcpStream::connect(address) {
             Ok(stream) => {
                 self.socket = Some(stream);
-                return Ok(());
+                Ok(())
             },
             Err(r) => {
                 self.socket = None;
-                return Err(r);
+                Err(r)
             }
         }
     }
@@ -40,21 +40,21 @@ impl Connection {
             Some(stream) => {
                 let message = &[message, b"\r\n"].concat();
                 println!("SENDING: {:?}", std::str::from_utf8(message)?);
-                stream.write(message)?;
+                stream.write_all(message)?;
                 Ok(())
             },
             _ => Err(Box::new(Connection::not_connected()))
         }
     }
 
-    pub(crate) fn read(&mut self) -> Result<IRCMessage, std::io::Error>{
+    pub(crate) fn read(&mut self) -> Result<IrcMessage, std::io::Error>{
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
                 self.buffer = [0;512];
                 let size = stream.read(&mut self.buffer)?;
-                Ok(IRCMessage{
-                    size: size,
+                Ok(IrcMessage{
+                    size,
                     text: &self.buffer
                 })
             },

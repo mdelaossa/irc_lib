@@ -1,5 +1,3 @@
-use irc_lib;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = irc_lib::Client::new("irc.subluminal.net:6667");
     connection.connect()?;

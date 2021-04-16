@@ -2,7 +2,7 @@ pub mod connection;
 pub mod message;
 
 // IRC protocol denotes 512 bytes as the max message length
-type RawIRCMessage = [u8; 512];
+type RawIrcMessage = [u8; 512];
 
 pub struct Client {
     pub server: String,
@@ -25,7 +25,7 @@ impl Client {
         self.client.send_message(message)
     }
 
-    pub fn read(&mut self) -> Result<message::IRCMessage, std::io::Error> {
+    pub fn read(&mut self) -> Result<message::IrcMessage, std::io::Error> {
         self.client.read()
      }
 }
