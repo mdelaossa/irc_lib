@@ -1,31 +1,50 @@
-pub mod connection;
+mod connection;
+mod irc_plugin;
 pub mod message;
+mod server;
 
-// IRC protocol denotes 512 bytes as the max message length
-type RawIrcMessage = [u8; 512];
+pub use irc_plugin::IrcPlugin;
+pub use message::IrcMessage;
+pub use server::Server;
+pub use Config as Client;
 
-pub struct Client {
-    pub server: String,
-    client : connection::Connection
+#[derive(Debug)]
+pub struct Config {
+    server: String,
+    nick: String,
+    channels: Vec<String>,
+    plugins: Vec<Box<dyn IrcPlugin>>
 }
 
-impl Client {
-    pub fn new(server: &str) -> Client {
-        Client {
+impl Config {
+    pub fn new(server: &str) -> Self {
+        Config {
             server: server.to_owned(),
-            client: connection::Connection::new()
+            nick: "User".to_owned(),
+            channels: Vec::new(),
+            plugins: Vec::new()
         }
     }
 
-    pub fn connect(&mut self) -> Result<(), std::io::Error> {
-        self.client.connect(&self.server)
+    pub fn nick(&mut self, nick: &str) -> &mut Self {
+        self.nick = nick.to_owned();
+        
+        self
     }
 
-    pub fn send_message(&mut self, message: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        self.client.send_message(message)
+    pub fn channel(&mut self, channel: &str) -> &mut Self {
+        self.channels.push(channel.to_owned());
+
+        self
     }
 
-    pub fn read(&mut self) -> Result<message::IrcMessage, std::io::Error> {
-        self.client.read()
-     }
+    pub fn register_plugin(&mut self, plugin: impl IrcPlugin + 'static) -> &mut Self {
+        self.plugins.push(Box::new(plugin));
+
+        self
+    }
+
+    pub fn build(self) -> Server {
+        Server::new(self)
+    }
 }

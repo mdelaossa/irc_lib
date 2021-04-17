@@ -3,11 +3,14 @@ pub mod negotiator;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-use super::message::IrcMessage;
+use crate::message::IrcMessage;
+
+// IRC protocol denotes 512 bytes as the max message length
+type RawIrcMessage = [u8; 512];
 
 pub(crate) struct Connection {
     socket: Option<TcpStream>,
-    buffer: super::RawIrcMessage
+    buffer: RawIrcMessage
 }
 
 impl Connection {
@@ -22,7 +25,7 @@ impl Connection {
         }
     }
 
-    pub(crate) fn connect(&mut self, address: &str) -> Result<(), std::io::Error> {
+    pub(crate) fn connect(&mut self, address: String) -> Result<(), std::io::Error> {
         match TcpStream::connect(address) {
             Ok(stream) => {
                 self.socket = Some(stream);
@@ -35,12 +38,12 @@ impl Connection {
         }
     }
 
-    pub(crate) fn send_message(&mut self, message: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn send_message(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
         match &mut self.socket {
             Some(stream) => {
-                let message = &[message, b"\r\n"].concat();
-                println!("SENDING: {:?}", std::str::from_utf8(message)?);
-                stream.write_all(message)?;
+                let bytes = &[message.as_bytes(), b"\r\n"].concat();
+                println!("SENDING: {:?}", message);
+                stream.write_all(bytes)?;
                 Ok(())
             },
             _ => Err(Box::new(Connection::not_connected()))
@@ -54,8 +57,8 @@ impl Connection {
                 self.buffer = [0;512];
                 let size = stream.read(&mut self.buffer)?;
                 Ok(IrcMessage{
-                    size,
-                    text: &self.buffer
+                    //text: std::str::from_utf8(&self.buffer[..size]).unwrap()
+                    text: String::from_utf8(self.buffer[..size].to_vec()).unwrap()
                 })
             },
             _ => Err(Connection::not_connected())
