@@ -19,10 +19,10 @@ impl irc_lib::IrcPlugin for BasicPlugin {
 }
 
 fn main() {
-    let mut config = irc_lib::Client::new("irc.subluminal.net:6667");
-    config.nick("rusty_test")
+    irc_lib::Client::new("irc.subluminal.net:6667")
+        .nick("rusty_test")
         .channel("#test_123")
-        .register_plugin(BasicPlugin);
-        
-    config.build().run()
+        .register_plugin(BasicPlugin)
+        .build()
+        .run()
  }

@@ -26,19 +26,19 @@ impl Config {
         }
     }
 
-    pub fn nick(&mut self, nick: &str) -> &mut Self {
+    pub fn nick(mut self, nick: &str) -> Self {
         self.nick = nick.to_owned();
         
         self
     }
 
-    pub fn channel(&mut self, channel: &str) -> &mut Self {
+    pub fn channel(mut self, channel: &str) -> Self {
         self.channels.push(channel.to_owned());
 
         self
     }
 
-    pub fn register_plugin(&mut self, plugin: impl IrcPlugin + 'static) -> &mut Self {
+    pub fn register_plugin(mut self, plugin: impl IrcPlugin + 'static) -> Self {
         self.plugins.push(Box::new(plugin));
 
         self
