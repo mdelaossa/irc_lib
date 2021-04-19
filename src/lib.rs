@@ -1,12 +1,10 @@
 mod connection;
 mod irc_plugin;
-pub mod message;
 mod server;
 
 pub use irc_plugin::IrcPlugin;
-pub use message::IrcMessage;
 pub use server::Server;
-pub use Config as Client;
+pub use Config as IrcClient;
 
 #[derive(Debug)]
 pub struct Config {

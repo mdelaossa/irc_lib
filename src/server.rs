@@ -1,21 +1,19 @@
 mod channel;
 mod user;
 
-use std::thread;
+use std::{sync::{Arc, Mutex}, thread};
 
-use crate::Config;
+use crate::{Config, connection::negotiator::Negotiator};
 use crate::connection::Connection;
-// use crate::message::IrcMessage;
 
 use channel::Channel;
-// use user::User;
 
 #[derive(Debug)]
 pub struct Server {
     pub address: String,
     pub channels: Vec<Channel>,
     config: Config,
-    thread: Option<thread::JoinHandle<()>>
+    connection: Arc<Mutex<Connection>>
 }
 
 pub trait IrcError {}
@@ -48,8 +46,8 @@ impl Server {
     pub fn new(config: Config) -> Self {
         Self {
             address: config.server.to_owned(),
-            thread: None,
             channels: Vec::new(),
+            connection: Arc::new(Mutex::new(Connection::new())),
             config
         }
     }
@@ -58,36 +56,52 @@ impl Server {
         self.connect();
     }
 
-    fn connect(mut self) {
-        let address = self.address.to_owned();
-        let config = self.config;
+    pub fn send_message(&self, message: &str) {
+        self.connection.lock().unwrap().send_message(message).unwrap();
+    }
 
-        self.thread = Some(std::thread::spawn(move || {
-            let mut connection = Connection::new();
+    fn connect(self) {
+        let connection = self.connection.clone();
 
-            connection.connect(address).unwrap();
+        let mut thread = Some(thread::spawn(move || {           
+            connection.lock().unwrap().connect(self.address.to_owned()).unwrap();
 
-            let mut negotiator = crate::connection::negotiator::Negotiator::new();
+            let mut negotiator = Negotiator::new(&self.config);
 
             loop {
+                let mut connection = connection.lock().unwrap();
                 let message = connection.read().unwrap();
 
-                println!("RECEIVED: {:?}", message.text);
+                match message {
+                    Some(message) => {
+                        println!("RECEIVED: {:?}", message);
                 
-                if message.text.contains("PING") {
-                    connection.send_message("PONG").unwrap();
-                } else if message.text.contains("VERSION") {
-                    connection.send_message("VERSION 123").unwrap();
-                } else if let Some(message) = negotiator.next() {
-                    connection.send_message(message).unwrap();
-                }else {
-                    for plugin in config.plugins.iter() {
-                        plugin.message(&message)
+                        if message.command().contains("PING") {
+                            connection.send_message(&format!("PONG :{}", message.params().unwrap().trailing().unwrap())).unwrap();
+                        } else if message.command().contains("VERSION") {
+                            connection.send_message("VERSION 123").unwrap();
+                        } else if message.params().unwrap().to_string().contains("\u{1}") { // CTCP message
+                            // Parse here, for now only return version.
+                            connection.send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message.prefix().unwrap().unwrap())).unwrap();
+                        // } else if let Some(message) = negotiator.next() {
+                        //     connection.send_message(message).unwrap();
+                        } else {
+                            drop(connection); // Unlock mutex on Connection
+                            for plugin in self.config.plugins.iter() {
+                                plugin.message(&self, &message)
+                            }
+                        }
+                    },
+                    None => {
+                        match negotiator.next() {
+                            Some(message) => connection.send_message(&message).unwrap(),
+                            None => continue
+                        };
                     }
-                }
+                };
             }
         }));
 
-        self.thread.unwrap().join().unwrap();
+        thread.take().unwrap().join().unwrap();
     }
 }

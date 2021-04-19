@@ -1,36 +1,44 @@
+use crate::Config;
+
 pub struct Negotiator {
+    channels: std::vec::IntoIter<String>,
     done: bool,
     messages: std::slice::Iter<'static, &'static str>
 }
 
 impl Negotiator {
-    const MESSAGES: [&'static str; 2] = ["NICK testing_a_rusty_thing", "USERNAME rusty 0 * None"];
-
-    pub fn new() -> Self {
+    pub fn new(config: &Config) -> Self {
         Negotiator {
+            channels: config.channels.clone().into_iter(),
             done: false,
-            messages: Negotiator::MESSAGES.iter()        
+            messages: [
+                "CAP LS 302",
+                "USER rusty 0 * None",
+                "NICK rusty_nick",
+                "CAP END"
+            ].iter()        
         }
     }
 }
 
-impl Default for Negotiator {
-    fn default() -> Self {
-        Negotiator::new()
-    }
-}
-
 impl Iterator for Negotiator {
-    type Item = &'static str;
+    type Item = String;
 
-    fn next(&mut self) -> Option<&'static str> {
+    fn next(&mut self) -> Option<String> {
         if self.done { return None }
         
         match self.messages.next() {
-            Some(n) => Some(n),
+            Some(n) => Some(n.to_string()),
             None => {
-                self.done = true;
-                None
+                // self.done = true;
+                // None
+                match self.channels.next() {
+                    Some(n) => Some(format!("JOIN {}", n)),
+                    None => {
+                        self.done = true;
+                        None
+                    }
+                }
             }
         }
     }

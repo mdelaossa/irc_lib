@@ -1,16 +1,14 @@
 pub mod negotiator;
 
-use std::io::prelude::*;
+use std::{io::{BufReader, prelude::*}, time::Duration};
 use std::net::TcpStream;
 
-use crate::message::IrcMessage;
+use irc_rust::Message;
 
-// IRC protocol denotes 512 bytes as the max message length
-type RawIrcMessage = [u8; 512];
-
+#[derive(Debug)]
 pub(crate) struct Connection {
-    socket: Option<TcpStream>,
-    buffer: RawIrcMessage
+    socket: Option<BufReader<TcpStream>>,
+    buffer: String
 }
 
 impl Connection {
@@ -21,14 +19,14 @@ impl Connection {
     pub(crate) fn new() -> Connection {
         Connection {
             socket: None,
-            buffer: [0; 512]
-        }
+            buffer: String::new()        }
     }
 
     pub(crate) fn connect(&mut self, address: String) -> Result<(), std::io::Error> {
         match TcpStream::connect(address) {
             Ok(stream) => {
-                self.socket = Some(stream);
+                stream.set_read_timeout(Some(Duration::from_millis(1500))).unwrap();
+                self.socket = Some(BufReader::new(stream));
                 Ok(())
             },
             Err(r) => {
@@ -43,23 +41,33 @@ impl Connection {
             Some(stream) => {
                 let bytes = &[message.as_bytes(), b"\r\n"].concat();
                 println!("SENDING: {:?}", message);
-                stream.write_all(bytes)?;
+                stream.get_ref().write_all(bytes)?;
                 Ok(())
             },
             _ => Err(Box::new(Connection::not_connected()))
         }
     }
 
-    pub(crate) fn read(&mut self) -> Result<IrcMessage, std::io::Error>{
+    pub(crate) fn read(&mut self) -> Result<Option<Message>, std::io::Error>{
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
-                self.buffer = [0;512];
-                let size = stream.read(&mut self.buffer)?;
-                Ok(IrcMessage{
-                    //text: std::str::from_utf8(&self.buffer[..size]).unwrap()
-                    text: String::from_utf8(self.buffer[..size].to_vec()).unwrap()
-                })
+                self.buffer = String::new();
+
+                match stream.read_line(&mut self.buffer) {
+                    Ok(_) => {
+                        Ok(Some(Message::from(self.buffer.as_str())))
+                    },
+                    Err(e) => {
+                        match e.kind() {
+                            std::io::ErrorKind::WouldBlock => {
+                                // Timed out, return so we can do stuff
+                                Ok(None)
+                            },
+                            _ => Err(e)
+                        }
+                    }
+                }
             },
             _ => Err(Connection::not_connected())
         }

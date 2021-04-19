@@ -1,3 +1,6 @@
+use irc_lib::{IrcClient, IrcPlugin};
+use irc_rust::Message;
+
 // Expected API:
 
 // impl IrcPLugin for STRUCT {
@@ -12,14 +15,18 @@
 
 #[derive(Debug)]
 struct BasicPlugin;
-impl irc_lib::IrcPlugin for BasicPlugin {
-    fn message(&self, message: &irc_lib::IrcMessage) {
-        println!("Plugin received message {:?}", message)
+impl IrcPlugin for BasicPlugin {
+    fn message(&self, server: &irc_lib::Server, message: &Message) {
+        // Just an echo for now
+        match message.command() {
+            "PRIVMSG" => server.send_message(format!("PRIVMSG {}", message.params().unwrap()).as_str()),
+            _ => ()
+        }
     }
 }
 
 fn main() {
-    irc_lib::Client::new("irc.subluminal.net:6667")
+    IrcClient::new("irc.subluminal.net:6667")
         .nick("rusty_test")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
