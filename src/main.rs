@@ -26,7 +26,7 @@ impl IrcPlugin for BasicPlugin {
 }
 
 fn main() {
-    let irc_client = IrcClient::new("192.168.33.10:6697")
+    let irc_client = IrcClient::new("irc.subluminal.net:6667")
         .nick("rusty_test")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
