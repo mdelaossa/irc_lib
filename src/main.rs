@@ -26,10 +26,23 @@ impl IrcPlugin for BasicPlugin {
 }
 
 fn main() {
-    IrcClient::new("irc.subluminal.net:6667")
+    let irc_client = IrcClient::new("192.168.33.10:6697")
         .nick("rusty_test")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
-        .build()
-        .run()
+        .build();
+
+    // let (reader, sender) = irc_client.channels(); // thread channels
+
+    // let ui = Ui::new();
+    // loop {
+    //     match ui::event {
+    //         // send some stuff to irc
+
+    //     }
+
+    //     match reader.events() {
+    //         // send some stuff to ui
+    //     }
+    // }
  }

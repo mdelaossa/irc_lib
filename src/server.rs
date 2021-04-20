@@ -1,7 +1,9 @@
+use irc_rust::Message;
+
 mod channel;
 mod user;
 
-use std::{sync::{Arc, Mutex}, thread};
+use std::{sync::{Arc, Mutex}, thread, thread::{JoinHandle}};
 
 use crate::{Config, connection::negotiator::Negotiator};
 use crate::connection::Connection;
@@ -14,6 +16,12 @@ pub struct Server {
     pub channels: Vec<Channel>,
     config: Config,
     connection: Arc<Mutex<Connection>>
+}
+
+struct Client {
+    thread: JoinHandle<()>,
+    snd_channel: std::sync::mpsc::Sender<Message>,
+    rcv_channel: std::sync::mpsc::Receiver<Message>
 }
 
 pub trait IrcError {}
@@ -102,6 +110,16 @@ impl Server {
             }
         }));
 
-        thread.take().unwrap().join().unwrap();
+        Client {
+            thread: thread,
+            rec_channel: rec_channel,
+            snd_channel: snd_channel
+        }
     }
 }
+
+impl Drop for Server {
+        fn drop(&mut self) {
+            self.thread.take().unwrap().join().unwrap();
+         }
+     }
