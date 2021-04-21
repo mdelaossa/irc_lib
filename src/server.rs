@@ -21,8 +21,8 @@ pub struct Server {
 #[derive(Debug)]
 pub struct Client {
     thread: Option<JoinHandle<()>>,
-    snd_channel: Sender<Message>,
-    rcv_channel: Receiver<Message>
+    snd_channel: Option<Sender<Message>>,
+    rcv_channel: Option<Receiver<Message>>
 }
 
 pub trait IrcError {}
@@ -121,14 +121,19 @@ impl Server {
 
         Client {
             thread: Some(thread),
-            rcv_channel,
-            snd_channel
+            rcv_channel: Some(rcv_channel),
+            snd_channel: Some(snd_channel)
         }
     }
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
+        // If we're here, no one is using our channels.
+        // Let's drop them so that Server doesn't grow its channels' buffer into the stratosphere
+        drop(self.snd_channel.take());
+        drop(self.rcv_channel.take());
+
         if let Some(thread) = self.thread.take() {
             thread.join().expect("Critical error with IRC Client. Aborting");
         }
@@ -137,6 +142,6 @@ impl Drop for Client {
 
 impl Client {
     pub fn channels(&self) -> (&Sender<Message>, &Receiver<Message>) {
-        (&self.snd_channel, &self.rcv_channel)
+        (self.snd_channel.as_ref().unwrap(), self.rcv_channel.as_ref().unwrap())
     }
 }
