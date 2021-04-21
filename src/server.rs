@@ -57,7 +57,9 @@ impl Server {
     }
 
     pub fn send_message(&self, message: &str) {
-        self.connection.lock().unwrap().send_message(message).unwrap();
+        if let Ok(mut connection) = self.connection.lock() {
+            connection.send_message(message).ok();
+        }
     }
 
     fn connect(self) {
@@ -83,8 +85,6 @@ impl Server {
                         } else if message.params().unwrap().to_string().contains("\u{1}") { // CTCP message
                             // Parse here, for now only return version.
                             connection.send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message.prefix().unwrap().unwrap())).unwrap();
-                        // } else if let Some(message) = negotiator.next() {
-                        //     connection.send_message(message).unwrap();
                         } else {
                             drop(connection); // Unlock mutex on Connection
                             for plugin in self.config.plugins.iter() {

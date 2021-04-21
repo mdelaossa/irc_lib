@@ -8,6 +8,7 @@ use irc_rust::Message;
         // IrcClient.send_message(some IrcMessage);
         // IrcCllient.{channels, users}
         // IrcChannel.users
+        // IrcChannel.send_message(some IrcMessage);
     // }
 // }
 // 

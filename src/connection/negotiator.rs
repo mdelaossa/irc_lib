@@ -30,8 +30,6 @@ impl Iterator for Negotiator {
         match self.messages.next() {
             Some(n) => Some(n.to_string()),
             None => {
-                // self.done = true;
-                // None
                 match self.channels.next() {
                     Some(n) => Some(format!("JOIN {}", n)),
                     None => {
