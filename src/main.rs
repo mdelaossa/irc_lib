@@ -27,10 +27,23 @@ impl IrcPlugin for BasicPlugin {
 }
 
 fn main() {
-    IrcClient::new("irc.subluminal.net:6667")
+    let irc_client = IrcClient::new("irc.subluminal.net:6667")
         .nick("rusty_test")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
         .build()
-        .run()
+        .run();
+    
+    let (sender, reader) = irc_client.channels(); // thread channels
+
+    loop {
+        for message in reader.try_iter() {
+            print!("Main thread received message: {}", message);
+
+            // Echo!
+            if message.command() == "PRIVMSG" {
+                sender.send(Message::from(format!("PRIVMSG {}", message.params().unwrap()).as_str())).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+            }
+        }
+    }
  }
