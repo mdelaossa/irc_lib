@@ -30,19 +30,19 @@ fn main() {
         .nick("rusty_test")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
-        .build();
+        .build()
+        .run();
+    
+    let (sender, reader) = irc_client.channels(); // thread channels
 
-    // let (reader, sender) = irc_client.channels(); // thread channels
+    loop {
+        for message in reader.try_iter() {
+            print!("Main thread received message: {}", message);
 
-    // let ui = Ui::new();
-    // loop {
-    //     match ui::event {
-    //         // send some stuff to irc
-
-    //     }
-
-    //     match reader.events() {
-    //         // send some stuff to ui
-    //     }
-    // }
+            // Echo!
+            if message.command() == "PRIVMSG" {
+                sender.send(Message::from(format!("PRIVMSG {}", message.params().unwrap()).as_str())).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+            }
+        }
+    }
  }

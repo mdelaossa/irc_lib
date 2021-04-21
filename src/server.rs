@@ -3,7 +3,7 @@ use irc_rust::Message;
 mod channel;
 mod user;
 
-use std::{sync::{Arc, Mutex}, thread, thread::{JoinHandle}};
+use std::{sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}, thread, thread::{JoinHandle}};
 
 use crate::{Config, connection::negotiator::Negotiator};
 use crate::connection::Connection;
@@ -18,10 +18,11 @@ pub struct Server {
     connection: Arc<Mutex<Connection>>
 }
 
-struct Client {
-    thread: JoinHandle<()>,
-    snd_channel: std::sync::mpsc::Sender<Message>,
-    rcv_channel: std::sync::mpsc::Receiver<Message>
+#[derive(Debug)]
+pub struct Client {
+    thread: Option<JoinHandle<()>>,
+    snd_channel: Sender<Message>,
+    rcv_channel: Receiver<Message>
 }
 
 pub trait IrcError {}
@@ -60,24 +61,31 @@ impl Server {
         }
     }
 
-    pub fn run(self) {
-        self.connect();
+    pub fn run(self) -> Client {
+        self.connect()
     }
 
     pub fn send_message(&self, message: &str) {
         self.connection.lock().unwrap().send_message(message).unwrap();
     }
 
-    fn connect(self) {
+    fn connect(self) -> Client {
         let connection = self.connection.clone();
+        let (thread_snd, rcv_channel) = mpsc::channel::<Message>();
+        let (snd_channel, thread_rcv) = mpsc::channel::<Message>();
 
-        let mut thread = Some(thread::spawn(move || {           
+        let thread = thread::spawn(move || {           
             connection.lock().unwrap().connect(self.address.to_owned()).unwrap();
 
             let mut negotiator = Negotiator::new(&self.config);
 
             loop {
                 let mut connection = connection.lock().unwrap();
+
+                for outgoing in thread_rcv.try_iter() {
+                    connection.send_message(&outgoing.to_string()).unwrap();
+                }
+
                 let message = connection.read().unwrap();
 
                 match message {
@@ -95,6 +103,7 @@ impl Server {
                         //     connection.send_message(message).unwrap();
                         } else {
                             drop(connection); // Unlock mutex on Connection
+                            thread_snd.send(message.clone()).ok();
                             for plugin in self.config.plugins.iter() {
                                 plugin.message(&self, &message)
                             }
@@ -108,18 +117,26 @@ impl Server {
                     }
                 };
             }
-        }));
+        });
 
         Client {
-            thread: thread,
-            rec_channel: rec_channel,
-            snd_channel: snd_channel
+            thread: Some(thread),
+            rcv_channel,
+            snd_channel
         }
     }
 }
 
-impl Drop for Server {
-        fn drop(&mut self) {
-            self.thread.take().unwrap().join().unwrap();
-         }
-     }
+impl Drop for Client {
+    fn drop(&mut self) {
+        if let Some(thread) = self.thread.take() {
+            thread.join().expect("Critical error with IRC Client. Aborting");
+        }
+    }
+}
+
+impl Client {
+    pub fn channels(&self) -> (&Sender<Message>, &Receiver<Message>) {
+        (&self.snd_channel, &self.rcv_channel)
+    }
+}
