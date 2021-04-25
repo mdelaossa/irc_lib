@@ -1,9 +1,7 @@
-use irc_rust::Message;
-
-use crate::{Server};
+use crate::{Server, message::IrcMessage};
 
 use std::fmt::Debug;
 
 pub trait IrcPlugin: Debug + Send {
-    fn message(&self, server: &Server, message: &Message);
+    fn message(&self, server: &Server, message: &IrcMessage);
 }

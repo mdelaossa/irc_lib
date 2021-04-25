@@ -1,9 +1,9 @@
-use irc_rust::Message;
+use crate::message::{IrcMessage, IrcMessageType};
 
 mod channel;
 mod user;
 
-use std::{sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}, thread, thread::{JoinHandle}};
+use std::{sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}, thread, thread::JoinHandle};
 
 use crate::{Config, connection::negotiator::Negotiator};
 use crate::connection::Connection;
@@ -21,8 +21,8 @@ pub struct Server {
 #[derive(Debug)]
 pub struct Client {
     thread: Option<JoinHandle<()>>,
-    snd_channel: Option<Sender<Message>>,
-    rcv_channel: Option<Receiver<Message>>
+    snd_channel: Option<Sender<IrcMessage>>,
+    rcv_channel: Option<Receiver<IrcMessage>>
 }
 
 pub trait IrcError {}
@@ -73,8 +73,8 @@ impl Server {
 
     fn connect(self) -> Client {
         let connection = self.connection.clone();
-        let (thread_snd, rcv_channel) = mpsc::channel::<Message>();
-        let (snd_channel, thread_rcv) = mpsc::channel::<Message>();
+        let (thread_snd, rcv_channel) = mpsc::channel::<IrcMessage>();
+        let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
 
         let thread = thread::spawn(move || {           
             connection.lock().unwrap().connect(self.address.to_owned()).unwrap();
@@ -94,11 +94,11 @@ impl Server {
                     Some(message) => {
                         println!("RECEIVED: {:?}", message);
                 
-                        if message.command().contains("PING") {
+                        if message.command == IrcMessageType::PING {
                             connection.send_message(&format!("PONG :{}", message.params().unwrap().trailing().unwrap())).unwrap();
-                        } else if message.command().contains("VERSION") {
+                        } else if message.command == IrcMessageType::VERSION {
                             connection.send_message("VERSION 123").unwrap();
-                        } else if message.params().unwrap().to_string().contains("\u{1}") { // CTCP message
+                        } else if message.params().unwrap().to_string().contains('\u{1}') { // CTCP message
                             // Parse here, for now only return version.
                             connection.send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message.prefix().unwrap().unwrap())).unwrap();
                         } else {
@@ -141,7 +141,7 @@ impl Drop for Client {
 }
 
 impl Client {
-    pub fn channels(&self) -> (&Sender<Message>, &Receiver<Message>) {
+    pub fn channels(&self) -> (&Sender<IrcMessage>, &Receiver<IrcMessage>) {
         (self.snd_channel.as_ref().unwrap(), self.rcv_channel.as_ref().unwrap())
     }
 }
