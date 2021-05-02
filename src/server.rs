@@ -1,12 +1,19 @@
-use crate::message::{IrcMessage, IrcMessageType};
+use crate::message::IrcMessage;
 
 mod channel;
 mod user;
 
-use std::{sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}, thread, thread::JoinHandle};
+use std::{
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
+    },
+    thread,
+    thread::JoinHandle,
+};
 
-use crate::{Config, connection::negotiator::Negotiator};
 use crate::connection::Connection;
+use crate::{connection::negotiator::Negotiator, Config};
 
 use channel::Channel;
 
@@ -15,21 +22,21 @@ pub struct Server {
     pub address: String,
     pub channels: Vec<Channel>,
     config: Config,
-    connection: Arc<Mutex<Connection>>
+    connection: Arc<Mutex<Connection>>,
 }
 
 #[derive(Debug)]
 pub struct Client {
     thread: Option<JoinHandle<()>>,
     snd_channel: Option<Sender<IrcMessage>>,
-    rcv_channel: Option<Receiver<IrcMessage>>
+    rcv_channel: Option<Receiver<IrcMessage>>,
 }
 
 pub trait IrcError {}
 
 #[derive(Debug, Clone)]
 struct ConnectionError<'a> {
-    server_address: &'a str
+    server_address: &'a str,
 }
 
 impl<'a> IrcError for ConnectionError<'a> {}
@@ -48,7 +55,7 @@ impl IrcError for ReadError {}
 impl std::fmt::Display for ReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "failure to read from server")
-    } 
+    }
 }
 
 impl Server {
@@ -57,7 +64,7 @@ impl Server {
             address: config.server.to_owned(),
             channels: Vec::new(),
             connection: Arc::new(Mutex::new(Connection::new())),
-            config
+            config,
         }
     }
 
@@ -76,8 +83,12 @@ impl Server {
         let (thread_snd, rcv_channel) = mpsc::channel::<IrcMessage>();
         let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
 
-        let thread = thread::spawn(move || {           
-            connection.lock().unwrap().connect(self.address.to_owned()).unwrap();
+        let thread = thread::spawn(move || {
+            connection
+                .lock()
+                .unwrap()
+                .connect(self.address.to_owned())
+                .unwrap();
 
             let mut negotiator = Negotiator::new(&self.config);
 
@@ -90,29 +101,42 @@ impl Server {
 
                 let message = connection.read().unwrap();
 
-                match message {
-                    Some(message) => {
-                        println!("RECEIVED: {:?}", message);
-                
-                        if message.command == IrcMessageType::PING {
-                            connection.send_message(&format!("PONG :{}", message.params().unwrap().trailing().unwrap())).unwrap();
-                        } else if message.command == IrcMessageType::VERSION {
-                            connection.send_message("VERSION 123").unwrap();
-                        } else if message.params().unwrap().to_string().contains('\u{1}') { // CTCP message
-                            // Parse here, for now only return version.
-                            connection.send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message.prefix().unwrap().unwrap())).unwrap();
-                        } else {
+                if let Some(message) = message {
+                    println!("RECEIVED: {:?}", message);
+
+                    match message {
+                        IrcMessage::PING(message) => connection
+                            .send_message(&format!(
+                                "PONG :{}",
+                                message.params().unwrap().trailing().unwrap()
+                            ))
+                            .unwrap(),
+                        IrcMessage::PRIVMSG(message)
+                            if message.params().unwrap().to_string().contains('\u{1}') =>
+                        {
+                            // CTCP message
+                            // TODO: Parse here, for now only return version.
+                            connection
+                                .send_message(&format!(
+                                    "NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}",
+                                    message.prefix().unwrap().unwrap()
+                                ))
+                                .unwrap();
+                        }
+                        IrcMessage::VERSION(_) => connection.send_message("VERSION 123").unwrap(),
+                        _ => {
                             drop(connection); // Unlock mutex on Connection
                             thread_snd.send(message.clone()).ok();
                             for plugin in self.config.plugins.iter() {
                                 plugin.message(&self, &message)
                             }
                         }
-                    },
-                    None => {
+                    }
+                } else {
+                    {
                         match negotiator.next() {
                             Some(message) => connection.send_message(&message).unwrap(),
-                            None => continue
+                            None => continue,
                         };
                     }
                 };
@@ -122,7 +146,7 @@ impl Server {
         Client {
             thread: Some(thread),
             rcv_channel: Some(rcv_channel),
-            snd_channel: Some(snd_channel)
+            snd_channel: Some(snd_channel),
         }
     }
 }
@@ -135,13 +159,18 @@ impl Drop for Client {
         drop(self.rcv_channel.take());
 
         if let Some(thread) = self.thread.take() {
-            thread.join().expect("Critical error with IRC Client. Aborting");
+            thread
+                .join()
+                .expect("Critical error with IRC Client. Aborting");
         }
     }
 }
 
 impl Client {
     pub fn channels(&self) -> (&Sender<IrcMessage>, &Receiver<IrcMessage>) {
-        (self.snd_channel.as_ref().unwrap(), self.rcv_channel.as_ref().unwrap())
+        (
+            self.snd_channel.as_ref().unwrap(),
+            self.rcv_channel.as_ref().unwrap(),
+        )
     }
 }

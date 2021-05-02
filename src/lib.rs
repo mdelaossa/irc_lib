@@ -4,7 +4,6 @@ mod server;
 mod message;
 
 pub use message::IrcMessage;
-pub use message::IrcMessageType;
 pub use irc_plugin::IrcPlugin;
 pub use server::Server;
 pub use Config as IrcClient;

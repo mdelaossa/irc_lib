@@ -56,7 +56,7 @@ impl Connection {
 
                 match stream.read_line(&mut self.buffer) {
                     Ok(_) => {
-                        Ok(Some(IrcMessage::from(self.buffer.as_str())))
+                        Ok(Some(IrcMessage::from(self.buffer.as_str()).unwrap()))
                     },
                     Err(e) => {
                         match e.kind() {

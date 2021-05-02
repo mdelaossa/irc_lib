@@ -1,4 +1,4 @@
-use irc_lib::{IrcClient, IrcMessage, IrcMessageType, IrcPlugin};
+use irc_lib::{IrcClient, IrcMessage, IrcPlugin};
 
 // Expected API:
 
@@ -18,8 +18,8 @@ struct BasicPlugin;
 impl IrcPlugin for BasicPlugin {
     fn message(&self, server: &irc_lib::Server, message: &IrcMessage) {
         // Just an echo for now
-        match message.command {
-            IrcMessageType::PRIVMSG => server.send_message(format!("PRIVMSG {}", message.params().unwrap()).as_str()),
+        match message {
+            IrcMessage::PRIVMSG(message) => server.send_message(format!("PRIVMSG {}", message.params().unwrap()).as_str()),
             _ => ()
         }
     }
@@ -37,11 +37,11 @@ fn main() {
 
     loop {
         for message in reader.try_iter() {
-            println!("Main thread received message: {:?}", message);
+            // println!("Main thread received message: {:?}", message);
 
             // Echo!
-            if message.command == IrcMessageType::PRIVMSG {
-                sender.send(IrcMessage::from(format!("PRIVMSG {}", message.params().unwrap()).as_str())).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+            if let IrcMessage::PRIVMSG(message) = message {
+                sender.send(IrcMessage::from(format!("PRIVMSG {}", message.params().unwrap()).as_str()).unwrap()).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
             }
         }
     }
