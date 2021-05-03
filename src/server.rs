@@ -1,26 +1,24 @@
-use crate::message::IrcMessage;
+use crate::message::{IrcMessage, Message};
 
-mod channel;
-mod user;
+pub mod channel;
+pub mod user;
 
-use std::{
-    sync::{
+use std::{collections::HashMap, sync::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
-    },
-    thread,
-    thread::JoinHandle,
-};
+    }, thread, thread::JoinHandle};
 
 use crate::connection::Connection;
 use crate::{connection::negotiator::Negotiator, Config};
 
 use channel::Channel;
 
+use self::user::User;
+
 #[derive(Debug)]
 pub struct Server {
     pub address: String,
-    pub channels: Vec<Channel>,
+    pub channels: HashMap<String, Channel>,
     config: Config,
     connection: Arc<Mutex<Connection>>,
 }
@@ -62,7 +60,7 @@ impl Server {
     pub fn new(config: Config) -> Self {
         Self {
             address: config.server.to_owned(),
-            channels: Vec::new(),
+            channels: config.channels.clone(),
             connection: Arc::new(Mutex::new(Connection::new())),
             config,
         }
@@ -78,7 +76,7 @@ impl Server {
         }
     }
 
-    fn connect(self) -> Client {
+    fn connect(mut self) -> Client {
         let connection = self.connection.clone();
         let (thread_snd, rcv_channel) = mpsc::channel::<IrcMessage>();
         let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
@@ -105,23 +103,14 @@ impl Server {
                     println!("RECEIVED: {:?}", message);
 
                     match message {
-                        IrcMessage::PING(message) => connection
-                            .send_message(&format!(
-                                "PONG :{}",
-                                message.params().unwrap().trailing().unwrap()
-                            ))
-                            .unwrap(),
+                        IrcMessage::Numeric(353, message) => self.parse_users(&message),
+                        IrcMessage::PING(message) => ping_response(&mut connection, &message),
                         IrcMessage::PRIVMSG(message)
                             if message.params().unwrap().to_string().contains('\u{1}') =>
                         {
                             // CTCP message
                             // TODO: Parse here, for now only return version.
-                            connection
-                                .send_message(&format!(
-                                    "NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}",
-                                    message.prefix().unwrap().unwrap()
-                                ))
-                                .unwrap();
+                            version_response(&mut connection, &message)
                         }
                         IrcMessage::VERSION(_) => connection.send_message("VERSION 123").unwrap(),
                         _ => {
@@ -149,6 +138,22 @@ impl Server {
             snd_channel: Some(snd_channel),
         }
     }
+
+    fn parse_users(&mut self, message: &Message) {
+        if let Some(params) = message.params() {
+            println!("Parsing users from {}", params);
+            let chan_name = params.iter().last().unwrap();
+            let users = params.trailing().unwrap().split_whitespace();
+
+            let channel = self.channels.entry(chan_name.to_string()).or_insert(Channel::new(chan_name));
+
+            for user in users {
+                let user = User::new(user);
+                channel.users.insert(user.nick.clone(), user);
+            }
+            println!("Channel: {:?}", channel);
+        }
+    }
 }
 
 impl Drop for Client {
@@ -173,4 +178,22 @@ impl Client {
             self.rcv_channel.as_ref().unwrap(),
         )
     }
+}
+
+fn ping_response(connection: &mut Connection, message: &Message) {
+    connection
+        .send_message(&format!(
+            "PONG :{}",
+            message.params().unwrap().trailing().unwrap()
+        ))
+        .unwrap()
+}
+
+fn version_response(connection: &mut Connection, message: &Message) {
+    connection
+        .send_message(&format!(
+            "NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}",
+            message.prefix().unwrap().unwrap()
+        ))
+        .unwrap();
 }

@@ -1,7 +1,7 @@
-use crate::Config;
+use crate::{Config, server::channel::Channel};
 
 pub struct Negotiator {
-    channels: std::vec::IntoIter<String>,
+    channels: std::collections::hash_map::IntoIter<String, Channel>,
     done: bool,
     messages: std::slice::Iter<'static, &'static str>
 }
@@ -31,7 +31,7 @@ impl Iterator for Negotiator {
             Some(n) => Some(n.to_string()),
             None => {
                 match self.channels.next() {
-                    Some(n) => Some(format!("JOIN {}", n)),
+                    Some((_, n)) => Some(format!("JOIN {}", n)),
                     None => {
                         self.done = true;
                         None

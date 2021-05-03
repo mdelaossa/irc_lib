@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 irc-rust = "0.3.3"
+regex = "1"

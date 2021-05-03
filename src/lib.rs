@@ -3,16 +3,20 @@ mod irc_plugin;
 mod server;
 mod message;
 
+use std::{collections::HashMap, str::FromStr};
+
 pub use message::IrcMessage;
 pub use irc_plugin::IrcPlugin;
 pub use server::Server;
 pub use Config as IrcClient;
 
+use server::channel::Channel;
+
 #[derive(Debug)]
 pub struct Config {
     server: String,
     nick: String,
-    channels: Vec<String>,
+    channels: HashMap<String, Channel>,
     plugins: Vec<Box<dyn IrcPlugin>>
 }
 
@@ -21,7 +25,7 @@ impl Config {
         Config {
             server: server.to_owned(),
             nick: "User".to_owned(),
-            channels: Vec::new(),
+            channels: HashMap::new(),
             plugins: Vec::new()
         }
     }
@@ -33,7 +37,8 @@ impl Config {
     }
 
     pub fn channel(mut self, channel: &str) -> Self {
-        self.channels.push(channel.to_owned());
+        let channel = Channel::from_str(channel).unwrap();
+        self.channels.insert(channel.name.clone(), channel);
 
         self
     }
