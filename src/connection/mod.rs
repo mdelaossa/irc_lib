@@ -3,7 +3,7 @@ pub mod negotiator;
 use std::{io::{BufReader, prelude::*}, time::Duration};
 use std::net::TcpStream;
 
-use crate::message::IrcMessage;
+use crate::{Server, message::IrcMessage};
 
 #[derive(Debug)]
 pub(crate) struct Connection {
@@ -48,7 +48,7 @@ impl Connection {
         }
     }
 
-    pub(crate) fn read(&mut self) -> Result<Option<IrcMessage>, std::io::Error>{
+    pub(crate) fn read(&mut self, server: &Server) -> Result<Option<IrcMessage>, std::io::Error>{
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
@@ -56,7 +56,7 @@ impl Connection {
 
                 match stream.read_line(&mut self.buffer) {
                     Ok(_) => {
-                        Ok(Some(IrcMessage::from(self.buffer.as_str()).unwrap()))
+                        Ok(Some(IrcMessage::from(self.buffer.as_str(), server).unwrap()))
                     },
                     Err(e) => {
                         match e.kind() {

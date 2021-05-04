@@ -1,11 +1,11 @@
 use std::{collections::HashMap, fmt::Display, str::FromStr};
 
-use super::user::UserEntry;
+use super::user::User;
 
 #[derive(Clone, Debug, Default)]
 pub struct Channel {
     pub name: String,
-    pub users: HashMap<String, UserEntry>
+    pub users: HashMap<String, User>
 }
 
 impl Channel {

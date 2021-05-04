@@ -1,8 +1,11 @@
 use std::{ops::Deref, str::FromStr};
 
+use crate::{Server, server::channel::Channel};
+
 #[derive(Debug, Clone)]
 pub struct Message {
     raw: irc_rust::Message,
+    pub channel: Option<Channel>
 }
 
 #[derive(Debug, Clone)]
@@ -19,10 +22,12 @@ pub enum IrcMessage {
 }
 
 impl Message {
-    fn from(str: &str) -> Self {
+    fn from(str: &str, server: &Server) -> Self {
         let msg = irc_rust::Message::from(str);
 
-        Self { raw: msg }
+        let channel = server.channels.get(msg.params().unwrap().iter().next().unwrap().to_owned()).unwrap();
+
+        Self { raw: msg, channel }
     }
 }
 
@@ -36,8 +41,8 @@ impl Deref for Message {
 
 impl IrcMessage {
     // so users of our crate don't have to `use std::FromStr`
-    pub fn from(s: &str) -> Result<Self, String> {
-        Self::from_str(s)
+    pub fn from(s: &str, server: &Server) -> Result<Self, String> {
+        Self::from_str(s, server)
     }
 }
 
@@ -62,8 +67,8 @@ impl Deref for IrcMessage {
 impl FromStr for IrcMessage {
     type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let message = Message::from(s);
+    fn from_str(s: &str, server: &Server) -> Result<Self, Self::Err> {
+        let message = Message::from(s, server);
         let command = message.command();
 
         match command {
