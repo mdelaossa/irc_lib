@@ -23,16 +23,10 @@ pub enum IrcMessage {
 }
 
 impl Message {
-    fn from(str: &str, channels: HashMap<String, Channel>) -> Self {
+    fn from(str: &str) -> Self {
         let msg = irc_rust::Message::from(str);
 
-        let channel = if let Some(params) = msg.params() {
-            channels.get(params.iter().next().unwrap_or("")).cloned()
-        } else {
-            None
-        };
-
-        Self { raw: msg, channel }
+        Self { raw: msg, channel: None }
     }
 
     fn from_str(str: &str) -> Self {
@@ -75,9 +69,19 @@ impl IrcMessage {
     }
 
     pub(crate) fn from_raw(s: &str, channels: HashMap<String, Channel>) -> Result<Self, String> {
-        let message = Message::from(s, channels);
+        let message = Message::from(s);
 
-        Self::parse_command(message)
+        let parsed_message = Self::parse_command(message);
+
+        parsed_message.map(|message| {
+            if let IrcMessage::PRIVMSG(mut message) = message {
+                let channel = channels.get(message.params().unwrap().iter().next().unwrap_or("")).cloned();
+                message.channel = channel;
+                
+                return IrcMessage::PRIVMSG(message)
+            } 
+            message
+        })
     }
 
     pub fn from(s: &str) -> Result<Self, String> {
