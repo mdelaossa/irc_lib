@@ -97,7 +97,7 @@ impl Server {
                     connection.send_message(&outgoing.to_string()).unwrap();
                 }
 
-                let message = connection.read().unwrap();
+                let message = connection.read(self.channels.clone()).unwrap();
 
                 if let Some(message) = message {
                     println!("RECEIVED: {:?}", message);

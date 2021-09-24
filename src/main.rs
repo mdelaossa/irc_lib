@@ -17,6 +17,7 @@ use irc_lib::{IrcClient, IrcMessage, IrcPlugin};
 struct BasicPlugin;
 impl IrcPlugin for BasicPlugin {
     fn message(&self, server: &irc_lib::Server, message: &IrcMessage) {
+        println!("Plugin received message from: {:?}", message.channel);
         // Just an echo for now
         match message {
             IrcMessage::PRIVMSG(message) => server.send_message(format!("PRIVMSG {}", message.params().unwrap()).as_str()),
