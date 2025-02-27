@@ -6,7 +6,7 @@ pub mod user;
 use std::{collections::HashMap, sync::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
-    }, thread, thread::JoinHandle};
+    }, thread::{self, JoinHandle}};
 
 use crate::connection::Connection;
 use crate::{connection::negotiator::Negotiator, Config};
@@ -56,10 +56,21 @@ impl std::fmt::Display for ReadError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct WriteError;
+
+impl IrcError for WriteError {}
+
+impl std::fmt::Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "failure to write to server")
+    }
+}
+
 impl Server {
     pub fn new(config: Config) -> Self {
         Self {
-            address: config.server.to_owned(),
+            address: config.server.clone(),
             channels: config.channels.clone(),
             connection: Arc::new(Mutex::new(Connection::new())),
             config,
@@ -70,10 +81,12 @@ impl Server {
         self.connect()
     }
 
-    pub fn send_message(&self, message: &str) {
-        if let Ok(mut connection) = self.connection.lock() {
-            connection.send_message(message).ok();
-        }
+    pub fn send_message(&self, message: &str) -> Result<(), WriteError> {
+        self.connection
+            .lock()
+            .map_err(|_| WriteError)?
+            .send_message(message)
+            .map_err(|_| WriteError)
     }
 
     fn connect(mut self) -> Client {
@@ -82,52 +95,49 @@ impl Server {
         let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
 
         let thread = thread::spawn(move || {
-            connection
-                .lock()
-                .unwrap()
-                .connect(self.address.to_owned())
-                .unwrap();
+            if let Ok(mut conn) = connection.lock() {
+                if conn.connect(self.address.clone()).is_err() {
+                    return;
+                }
+            }
 
             let mut negotiator = Negotiator::new(&self.config);
 
             loop {
-                let mut connection = connection.lock().unwrap();
+                let mut conn = match connection.lock() {
+                    Ok(conn) => conn,
+                    Err(_) => continue,
+                };
 
                 for outgoing in thread_rcv.try_iter() {
-                    connection.send_message(&outgoing.to_string()).unwrap();
+                    let _ = conn.send_message(&outgoing.to_string());
                 }
 
-                let message = connection.read(self.channels.clone()).unwrap();
-
-                if let Some(message) = message {
+                if let Ok(Some(message)) = conn.read(self.channels.clone()) {
                     println!("RECEIVED: {:?}", message);
 
-                    match message {
-                        IrcMessage::Numeric(353, message) => self.parse_users(&message),
-                        IrcMessage::PING(message) => ping_response(&mut connection, &message),
+                    match &message {
+                        IrcMessage::Numeric(353, message) => self.parse_users(message),
+                        IrcMessage::PING(message) => ping_response(&mut conn, message),
                         IrcMessage::PRIVMSG(message)
-                            if message.params().unwrap().to_string().contains('\u{1}') =>
+                            if message.params().map(|p| p.to_string().contains('\u{1}')).unwrap_or(false) =>
                         {
                             // CTCP message
                             // TODO: Parse here, for now only return version.
-                            version_response(&mut connection, &message)
+                            version_response(&mut conn, message)
                         }
-                        IrcMessage::VERSION(_) => connection.send_message("VERSION 123").unwrap(),
-                        _ => {
-                            drop(connection); // Unlock mutex on Connection
-                            thread_snd.send(message.clone()).ok();
-                            for plugin in self.config.plugins.iter() {
-                                plugin.message(&self, &message)
-                            }
-                        }
+                        IrcMessage::VERSION(_) => conn.send_message("VERSION 123").unwrap(),
+                        _ => (),
+                        
                     }
-                } else {
-                    {
-                        match negotiator.next() {
-                            Some(message) => connection.send_message(&message).unwrap(),
-                            None => continue,
-                        };
+                    thread_snd.send(message.clone()).ok();
+                    drop(conn); // Unlock mutex on Connection - needed so plugins can send messages
+                    for plugin in self.config.plugins.iter() {
+                        plugin.message(&self, &message)
                     }
+
+                } else if let Some(message) = negotiator.next() {
+                    let _ = conn.send_message(&message);
                 };
             }
         });

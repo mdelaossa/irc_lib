@@ -1,4 +1,5 @@
 use irc_lib::{IrcClient, IrcMessage, IrcPlugin};
+use irc_rust::Params;
 
 // Expected API:
 
@@ -17,10 +18,16 @@ use irc_lib::{IrcClient, IrcMessage, IrcPlugin};
 struct BasicPlugin;
 impl IrcPlugin for BasicPlugin {
     fn message(&self, server: &irc_lib::Server, message: &IrcMessage) {
-        println!("Plugin received message from: {:?}", message.channel);
+        let params = message.params().unwrap_or(Params::new());
         // Just an echo for now
+        println!("Plugin received message: {:?}", message);
         match message {
-            IrcMessage::PRIVMSG(message) => server.send_message(format!("PRIVMSG {}", message.params().unwrap()).as_str()),
+            IrcMessage::PRIVMSG(_message) => {
+                println!("Plugin received message from: {:?}", message.channel);
+                if let Err(e) = server.send_message(format!("PRIVMSG {}", params).as_str()) {
+                    println!("Error sending message: {:?}", e)
+                }
+            },
             _ => ()
         }
     }
@@ -29,6 +36,7 @@ impl IrcPlugin for BasicPlugin {
 fn main() {
     let irc_client = IrcClient::new("irc.subluminal.net:6667")
         .nick("rusty_test")
+        .user("rustacean")
         .channel("#test_123")
         .register_plugin(BasicPlugin)
         .build()
@@ -36,14 +44,12 @@ fn main() {
     
     let (sender, reader) = irc_client.channels(); // thread channels
 
-    loop {
-        for message in reader.try_iter() {
-            // println!("Main thread received message: {:?}", message);
+    for message in reader.iter() {
+        println!("Main thread received message: {:?}", message);
 
-            // Echo!
-            if let IrcMessage::PRIVMSG(message) = message {
-                sender.send(IrcMessage::from(format!("PRIVMSG {}", message.params().unwrap()).as_str()).unwrap()).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
-            }
+        // Echo!
+        if let IrcMessage::PRIVMSG(message) = message {
+            sender.send(IrcMessage::from(format!("PRIVMSG {}", message.params().unwrap()).as_str()).unwrap()).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
         }
     }
  }
