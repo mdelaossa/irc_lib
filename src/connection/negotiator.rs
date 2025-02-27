@@ -3,7 +3,7 @@ use crate::{Config, server::channel::Channel};
 pub struct Negotiator {
     channels: std::collections::hash_map::IntoIter<String, Channel>,
     done: bool,
-    messages: std::slice::Iter<'static, &'static str>
+    messages: std::vec::IntoIter<String>
 }
 
 impl Negotiator {
@@ -11,12 +11,12 @@ impl Negotiator {
         Negotiator {
             channels: config.channels.clone().into_iter(),
             done: false,
-            messages: [
-                "CAP LS 302",
-                "USER rusty 0 * None",
-                "NICK rusty_nick",
-                "CAP END"
-            ].iter()        
+            messages: vec![
+                "CAP LS 302".to_string(),
+                format!("USER {} 0 * None", config.user),
+                format!("NICK {}", config.nick),
+                "CAP END".to_string()
+            ].into_iter()
         }
     }
 }
@@ -24,20 +24,18 @@ impl Negotiator {
 impl Iterator for Negotiator {
     type Item = String;
 
-    fn next(&mut self) -> Option<String> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.done { return None }
-        
-        match self.messages.next() {
-            Some(n) => Some(n.to_string()),
-            None => {
-                match self.channels.next() {
-                    Some((_, n)) => Some(format!("JOIN {}", n)),
-                    None => {
-                        self.done = true;
-                        None
-                    }
-                }
-            }
+
+        if let Some(n) = self.messages.next() {
+            return Some(n)
         }
+
+        if let Some((_, n)) = self.channels.next() {
+            return Some(format!("JOIN {}", n))
+        }
+
+        self.done = true;
+        None
     }
 }

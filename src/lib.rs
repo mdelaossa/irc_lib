@@ -16,6 +16,7 @@ use server::channel::Channel;
 pub struct Config {
     server: String,
     nick: String,
+    user: String,
     channels: HashMap<String, Channel>,
     plugins: Vec<Box<dyn IrcPlugin>>
 }
@@ -25,6 +26,7 @@ impl Config {
         Config {
             server: server.to_owned(),
             nick: "User".to_owned(),
+            user: "rusty".to_owned(),
             channels: HashMap::new(),
             plugins: Vec::new()
         }
@@ -33,6 +35,12 @@ impl Config {
     pub fn nick(mut self, nick: &str) -> Self {
         self.nick = nick.to_owned();
         
+        self
+    }
+
+    pub fn user(mut self, user: &str) -> Self {
+        self.user = user.to_owned();
+
         self
     }
 
