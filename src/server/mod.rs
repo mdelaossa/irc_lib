@@ -1,19 +1,22 @@
 use crate::message::{IrcMessage, Message};
-
-pub mod channel;
-pub mod user;
+use crate::connection::Connection;
+use crate::{connection::negotiator::Negotiator, Config};
 
 use std::{collections::HashMap, sync::{
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     }, thread::{self, JoinHandle}};
 
-use crate::connection::Connection;
-use crate::{connection::negotiator::Negotiator, Config};
+
+use err_derive::Error;
 
 use channel::Channel;
 
 use self::user::User;
+
+pub mod channel;
+pub mod user;
+
 
 #[derive(Debug)]
 pub struct Server {
@@ -21,6 +24,7 @@ pub struct Server {
     pub channels: HashMap<String, Channel>,
     config: Config,
     connection: Arc<Mutex<Connection>>,
+    sender: Option<Sender<IrcMessage>>
 }
 
 #[derive(Debug)]
@@ -30,42 +34,16 @@ pub struct Client {
     rcv_channel: Option<Receiver<IrcMessage>>,
 }
 
-pub trait IrcError {}
-
-#[derive(Debug, Clone)]
-struct ConnectionError<'a> {
-    server_address: &'a str,
+#[derive(Debug, Error)]
+pub enum IrcError {
+    #[error(display="failed to connect to {:?}", _0)]
+    ConnectionError(String),
+    #[error(display="failed to read from {:?}", _0)]
+    ReadError(String),
+    #[error(display="failed to write to {:?}. Reason: {:?}", _0, _1)]
+    WriteError(String, String),
 }
 
-impl<'a> IrcError for ConnectionError<'a> {}
-
-impl<'a> std::fmt::Display for ConnectionError<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "failure to connect to {}", self.server_address)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct ReadError;
-
-impl IrcError for ReadError {}
-
-impl std::fmt::Display for ReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "failure to read from server")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WriteError;
-
-impl IrcError for WriteError {}
-
-impl std::fmt::Display for WriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "failure to write to server")
-    }
-}
 
 impl Server {
     pub fn new(config: Config) -> Self {
@@ -73,6 +51,7 @@ impl Server {
             address: config.server.clone(),
             channels: config.channels.clone(),
             connection: Arc::new(Mutex::new(Connection::new())),
+            sender: None,
             config,
         }
     }
@@ -81,18 +60,19 @@ impl Server {
         self.connect()
     }
 
-    pub fn send_message(&self, message: &str) -> Result<(), WriteError> {
-        self.connection
-            .lock()
-            .map_err(|_| WriteError)?
-            .send_message(message)
-            .map_err(|_| WriteError)
+    pub fn send_message(&self, message: IrcMessage) -> Result<(), IrcError> {
+        if let Some(sender) = &self.sender {
+            sender.send(message).map_err(|r| IrcError::WriteError(self.address.clone(), r.to_string()))
+        } else {
+            Err(IrcError::WriteError(self.address.clone(), "Not connected".to_string()))
+        }
     }
 
     fn connect(mut self) -> Client {
         let connection = self.connection.clone();
         let (thread_snd, rcv_channel) = mpsc::channel::<IrcMessage>();
         let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
+        self.sender = Some(snd_channel.clone());
 
         let thread = thread::spawn(move || {
             if let Ok(mut conn) = connection.lock() {
@@ -131,7 +111,6 @@ impl Server {
                         
                     }
                     thread_snd.send(message.clone()).ok();
-                    drop(conn); // Unlock mutex on Connection - needed so plugins can send messages
                     for plugin in self.config.plugins.iter() {
                         plugin.message(&self, &message)
                     }

@@ -24,7 +24,8 @@ impl IrcPlugin for BasicPlugin {
         match message {
             IrcMessage::PRIVMSG(_message) => {
                 println!("Plugin received message from: {:?}", message.channel);
-                if let Err(e) = server.send_message(format!("PRIVMSG {}", params).as_str()) {
+                let msg = IrcMessage::from(format!("PRIVMSG {}", params).as_str()).unwrap();
+                if let Err(e) = server.send_message(msg) {
                     println!("Error sending message: {:?}", e)
                 }
             },
