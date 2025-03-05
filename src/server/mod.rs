@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::{
     }, thread::{self, JoinHandle}};
 
 
-use err_derive::Error;
+use thiserror::Error;
 
 use channel::Channel;
 
@@ -36,11 +36,11 @@ pub struct Client {
 
 #[derive(Debug, Error)]
 pub enum IrcError {
-    #[error(display="failed to connect to {:?}", _0)]
+    #[error("failed to connect to {:?}", _0)]
     ConnectionError(String),
-    #[error(display="failed to read from {:?}", _0)]
+    #[error("failed to read from {:?}", _0)]
     ReadError(String),
-    #[error(display="failed to write to {:?}. Reason: {:?}", _0, _1)]
+    #[error("failed to write to {:?}. Reason: {:?}", _0, _1)]
     WriteError(String, String),
 }
 
