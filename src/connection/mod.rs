@@ -1,9 +1,9 @@
 pub mod negotiator;
 
-use std::{collections::HashMap, io::{BufReader, prelude::*}, time::Duration};
+use std::{io::{BufRead, BufReader, Write}, time::Duration};
 use std::net::TcpStream;
 
-use crate::{message::IrcMessage, server::channel::Channel};
+use crate::message::IrcMessage;
 
 #[derive(Debug)]
 pub(crate) struct Connection {
@@ -48,7 +48,7 @@ impl Connection {
         }
     }
 
-    pub(crate) fn read(&mut self, channels: HashMap<String, Channel>) -> Result<Option<IrcMessage>, std::io::Error>{
+    pub(crate) fn read(&mut self) -> Result<Option<IrcMessage>, std::io::Error>{
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
@@ -56,7 +56,7 @@ impl Connection {
 
                 match stream.read_line(&mut self.buffer) {
                     Ok(_) => {
-                        Ok(Some(IrcMessage::from_raw(self.buffer.as_str(), channels).unwrap()))
+                        Ok(Some(IrcMessage::from_str(self.buffer.as_str()).unwrap()))
                     },
                     Err(e) => {
                         match e.kind() {

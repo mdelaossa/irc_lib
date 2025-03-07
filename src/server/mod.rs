@@ -1,4 +1,4 @@
-use crate::message::{IrcMessage, Message};
+use crate::message::{self, Command, IrcMessage};
 use crate::connection::Connection;
 use crate::{connection::negotiator::Negotiator, Config};
 
@@ -93,20 +93,26 @@ impl Server {
                     let _ = conn.send_message(&outgoing.to_string());
                 }
 
-                if let Ok(Some(message)) = conn.read(self.channels.clone()) {
+                if let Ok(Some(message)) = conn.read() {
                     println!("RECEIVED: {:?}", message);
 
                     match &message {
-                        IrcMessage::Numeric(353, message) => self.parse_users(message),
-                        IrcMessage::PING(message) => ping_response(&mut conn, message),
-                        IrcMessage::PRIVMSG(message)
-                            if message.params().map(|p| p.to_string().contains('\u{1}')).unwrap_or(false) =>
-                        {
-                            // CTCP message
-                            // TODO: Parse here, for now only return version.
-                            version_response(&mut conn, message)
-                        }
-                        IrcMessage::VERSION(_) => conn.send_message("VERSION 123").unwrap(),
+                        IrcMessage { command: Command::Numeric(353), params, ..} => self.parse_users(params),
+                        IrcMessage { command: Command::Ping, .. } => ping_response(&mut conn, &message),
+                        IrcMessage { command: Command::PrivMsg, params, .. } => {
+                            for param in params {
+                                match param {
+                                    message::Param::Message(message) => {
+                                        if message.contains('\u{1}') {
+                                            // CTCP message
+                                            version_response(&mut conn, message)
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        },
+                        IrcMessage { command: Command::Version, .. } => conn.send_message("VERSION 123").unwrap(),
                         _ => (),
                         
                     }
@@ -128,20 +134,19 @@ impl Server {
         }
     }
 
-    fn parse_users(&mut self, message: &Message) {
-        if let Some(params) = message.params() {
-            println!("Parsing users from {}", params);
-            let chan_name = params.iter().last().unwrap();
-            let users = params.trailing().unwrap().split_whitespace();
-
-            let channel = self.channels.entry(chan_name.to_string()).or_insert(Channel::new(chan_name));
-
-            for user in users {
+    // This is a 353 message we need to parse
+    fn parse_users(&mut self, params: &Vec<message::Param>) {
+        // 2nd param is the channel name, 3rd and onwards are the users
+        let channel_name = params[2].to_string();
+        let channel = self.channels.entry(channel_name.to_string()).or_insert(Channel::new(&channel_name));
+        println!("Channel: {:?}", channel);
+        for param in params[3..].iter() {
+            if let message::Param::Unknown(user) = param {
                 let user = User::new(user);
                 channel.users.insert(user.nick.clone(), user);
             }
-            println!("Channel: {:?}", channel);
         }
+        println!("Channel: {:?}", channel);
     }
 }
 
@@ -169,20 +174,30 @@ impl Client {
     }
 }
 
-fn ping_response(connection: &mut Connection, message: &Message) {
-    connection
+fn ping_response(connection: &mut Connection, message: &IrcMessage) {
+    let msg = message.params.iter().find_map(|param| {
+        if let message::Param::Message(ref msg) = param {
+            Some(msg)
+        } else {
+            None
+        }
+    });
+
+    if let Some(msg) = msg {
+        connection
         .send_message(&format!(
             "PONG :{}",
-            message.params().unwrap().trailing().unwrap()
+            msg
         ))
         .unwrap()
+    }
 }
 
-fn version_response(connection: &mut Connection, message: &Message) {
+fn version_response(connection: &mut Connection, message: &str) {
     connection
         .send_message(&format!(
             "NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}",
-            message.prefix().unwrap().unwrap()
+            message
         ))
         .unwrap();
 }

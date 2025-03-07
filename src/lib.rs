@@ -1,7 +1,7 @@
 mod connection;
 mod irc_plugin;
 mod server;
-mod message;
+pub mod message;
 
 use std::{collections::HashMap, str::FromStr};
 
