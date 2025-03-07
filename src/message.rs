@@ -229,10 +229,18 @@ impl IrcMessage {
             result.push(' ');
         }
         result.push_str(&self.command.to_string());
+        let mut msg = "".to_string();
         for param in &self.params {
-            result.push(' ');
-            result.push_str(&param.to_string());
+            match param {
+                Param::Message(m) => msg = format!(" :{}", m),
+                _ => {
+                    result.push(' ');
+                    result.push_str(&param.to_string());
+                },
+            }
+
         }
+        result.push_str(&msg);
         result
     }
 
@@ -467,6 +475,18 @@ mod tests {
                 Param::Message("Hello, world!".to_string())
             ]
         );
+    }
+
+    #[test]
+    fn test_build_privmsg_correct_order() {
+        let msg = IrcMessage::builder()
+            .prefix("nick!user@some.server")
+            .command(Command::PrivMsg)
+            .param(Param::Message("Hello, world!".to_string()))
+            .param(Param::Channel("#channel".to_string()))
+            .build()
+            .unwrap();
+        assert_eq!(msg.to_string(), ":nick!user@some.server PRIVMSG #channel :Hello, world!");
     }
 
     #[test]
