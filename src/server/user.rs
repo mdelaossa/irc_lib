@@ -1,5 +1,3 @@
-use regex::Regex;
-
 #[derive(Clone, Debug)]
 pub struct User {
     pub nick: String,
@@ -17,14 +15,10 @@ impl User {
     pub(crate) fn new(nick: &str) -> Self {
         let (perm, nick) = Self::parse_nick(nick);
 
-        let perm = if let Some(perm) = perm {
-            match perm.as_str() {
-                "@" => UserType::Op,
-                "%" => UserType::HalfOp,
-                _ => unreachable!(),
-            }
-        } else {
-            UserType::Regular
+        let perm = match perm {
+            Some('@') => UserType::Op,
+            Some('%') => UserType::HalfOp,
+            _ => UserType::Regular,
         };
         
         User {
@@ -33,10 +27,13 @@ impl User {
         }
     }
 
-    fn parse_nick(str: &str) -> (Option<regex::Match>, &str) {
-        let re = Regex::new(r"([@%])?(\w+)").unwrap();
-        let caps = re.captures(str).unwrap();
-
-        (caps.get(1), caps.get(2).unwrap().as_str())
+    fn parse_nick(input: &str) -> (Option<char>, &str) {
+        let mut chars = input.chars();
+        let prefix = match chars.next() {
+            Some(c) if c == '@' || c == '%' => Some(c),
+            Some(_c) => None,
+            None => return (None, ""),
+        };
+        (prefix, chars.as_str())
     }
 }

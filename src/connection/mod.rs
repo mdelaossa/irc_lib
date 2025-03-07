@@ -16,6 +16,10 @@ impl Connection {
         std::io::Error::new(std::io::ErrorKind::NotConnected, "Not Connected")
     }
 
+    fn closed() -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::NotConnected, "Connection Closed")
+    }
+
     pub(crate) fn new() -> Connection {
         Connection {
             socket: None,
@@ -52,11 +56,19 @@ impl Connection {
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
-                self.buffer = String::new();
+                self.buffer.clear();
 
                 match stream.read_line(&mut self.buffer) {
+                    Ok(0) => {
+                        // Connection closed
+                        self.socket = None;
+                        Err(Connection::closed())
+                    },
                     Ok(_) => {
-                        Ok(Some(IrcMessage::from_str(self.buffer.as_str()).unwrap()))
+                        match IrcMessage::from_str(self.buffer.as_str()) {
+                            Ok(msg) => Ok(Some(msg)),
+                            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+                        }
                     },
                     Err(e) => {
                         match e.kind() {
@@ -69,7 +81,7 @@ impl Connection {
                     }
                 }
             },
-            _ => Err(Connection::not_connected())
+            None => Err(Connection::not_connected())
         }
     }
 }

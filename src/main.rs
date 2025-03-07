@@ -49,7 +49,7 @@ fn main() {
         .register_plugin(BasicPlugin)
         .build()
         .run();
-    
+
     let (sender, reader) = irc_client.channels(); // thread channels
 
     for message in reader.iter() {

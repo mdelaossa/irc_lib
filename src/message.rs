@@ -1,5 +1,7 @@
 use std::fmt;
 
+use thiserror::Error;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IrcMessage {
     pub prefix: Option<Prefix>,
@@ -69,6 +71,12 @@ pub enum Param {
     Unknown(String),
 }
 
+#[derive(Error, Debug)]
+pub enum IrcMessageError {
+    #[error("missing command")]
+    MissingCommand,
+}
+
 impl IrcMessage {
     pub fn new(prefix: Option<Prefix>, command: Command, params: Vec<Param>) -> Self {
         IrcMessage {
@@ -78,7 +86,8 @@ impl IrcMessage {
         }
     }
 
-    pub fn from_str(input: &str) -> Result<Self, &'static str> {
+    pub fn from_str(input: &str) -> Result<Self, IrcMessageError> {
+        println!("Parsing: {}", input);
         let mut parts = input.split_whitespace();
         let prefix = if input.starts_with(':') {
             parts.next().map(|s| s[1..].to_string()).and_then(|s| {
@@ -107,7 +116,7 @@ impl IrcMessage {
             None
         };
 
-        let command_str = parts.next().ok_or("Missing command")?.to_string();
+        let command_str = parts.next().ok_or(IrcMessageError::MissingCommand)?.to_string();
         let command = match command_str.as_str() {
             "JOIN" => Command::Join,
             "PART" => Command::Part,
@@ -210,12 +219,16 @@ impl IrcMessage {
                     params.push(Param::Message(message[1..].to_string()));
                 }
             }
-            Command::Unknown(_) | Command::Numeric(_) => {
+            _ => {
                 for part in parts {
-                    params.push(Param::Unknown(part.to_string()));
+                    let param = match part.chars().next() {
+                        Some(':') => Param::Message(part[1..].to_string()),
+                        Some('#') => Param::Channel(part.to_string()),
+                        _ => Param::Unknown(part.to_string()),
+                    };
+                    params.push(param);
                 }
             }
-            _ => {}
         }
 
         params
@@ -396,7 +409,7 @@ impl IrcMessageBuilder {
         self
     }
 
-    pub fn build(self) -> Result<IrcMessage, &'static str> {
+    pub fn build(self) -> Result<IrcMessage, IrcMessageError> {
         if let Some(command) = self.command {
             Ok(IrcMessage {
                 prefix: self.prefix,
@@ -404,7 +417,7 @@ impl IrcMessageBuilder {
                 params: self.params,
             })
         } else {
-            Err("Command is required")
+            Err(IrcMessageError::MissingCommand)
         }
     }
 }

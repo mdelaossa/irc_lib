@@ -93,37 +93,46 @@ impl Server {
                     let _ = conn.send_message(&outgoing.to_string());
                 }
 
-                if let Ok(Some(message)) = conn.read() {
-                    println!("RECEIVED: {:?}", message);
+                match conn.read() {
+                    Ok(Some(message)) => {
+                        println!("RECEIVED: {:?}", message);
 
-                    match &message {
-                        IrcMessage { command: Command::Numeric(353), params, ..} => self.parse_users(params),
-                        IrcMessage { command: Command::Ping, .. } => ping_response(&mut conn, &message),
-                        IrcMessage { command: Command::PrivMsg, params, .. } => {
-                            for param in params {
-                                match param {
-                                    message::Param::Message(message) => {
-                                        if message.contains('\u{1}') {
-                                            // CTCP message
-                                            version_response(&mut conn, message)
+                        match &message {
+                            IrcMessage { command: Command::Numeric(353), params, ..} => self.parse_users(params),
+                            IrcMessage { command: Command::Ping, .. } => ping_response(&mut conn, &message),
+                            IrcMessage { command: Command::PrivMsg, params, .. } => {
+                                for param in params {
+                                    match param {
+                                        message::Param::Message(message) => {
+                                            if message.contains('\u{1}') {
+                                                // CTCP message
+                                                version_response(&mut conn, message)
+                                            }
                                         }
+                                        _ => {}
                                     }
-                                    _ => {}
                                 }
-                            }
-                        },
-                        IrcMessage { command: Command::Version, .. } => conn.send_message("VERSION 123").unwrap(),
-                        _ => (),
-                        
-                    }
-                    thread_snd.send(message.clone()).ok();
-                    for plugin in self.config.plugins.iter() {
-                        plugin.message(&self, &message)
-                    }
+                            },
+                            IrcMessage { command: Command::Version, .. } => conn.send_message("VERSION 123").unwrap(),
+                            _ => (),
+                            
+                        }
+                        thread_snd.send(message.clone()).ok();
+                        for plugin in self.config.plugins.iter() {
+                            plugin.message(&self, &message)
+                        }
 
-                } else if let Some(message) = negotiator.next() {
-                    let _ = conn.send_message(&message);
-                };
+                    },
+                    Ok(None) => {
+                        if let Some(message) = negotiator.next() {
+                            let _ = conn.send_message(&message);
+                        }
+                    }
+                    Err(e) => {
+                        println!("Error reading from connection: {:?}", e);
+                        break;
+                    },                
+                }
             }
         });
 
@@ -152,11 +161,11 @@ impl Server {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        // If we're here, no one is using our channels.
-        // Let's drop them so that Server doesn't grow its channels' buffer into the stratosphere
+        // If we're here, no one is gonna be using our channels, so let's clean up
         drop(self.snd_channel.take());
         drop(self.rcv_channel.take());
 
+        // Join the thread so the server keeps running
         if let Some(thread) = self.thread.take() {
             thread
                 .join()
@@ -171,6 +180,21 @@ impl Client {
             self.snd_channel.as_ref().unwrap(),
             self.rcv_channel.as_ref().unwrap(),
         )
+    }
+
+    pub fn shutdown(self) -> Result<(), ()> {
+        // Time to close our connection!
+        if let Some(send) = &self.snd_channel {
+            if let Ok(msg) = IrcMessage::builder()
+            .command(Command::Quit)
+            .param(message::Param::Message("Client shutting down".to_string()))
+            .build() {
+                send.send(msg).map_err(|_| ())?
+            }
+        }
+
+        drop(self);
+        Ok(())
     }
 }
 
