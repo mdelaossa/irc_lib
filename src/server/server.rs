@@ -1,4 +1,4 @@
-use crate::message::{IrcCommand, IrcMessageParam, IrcMessage};
+use crate::message::{Command, Param, IrcMessage};
 use crate::connection::Connection;
 use crate::{connection::ConnectionNegotiator, Config};
 
@@ -75,12 +75,12 @@ impl Server {
                         println!("RECEIVED: {:?}", message);
 
                         match &message {
-                            IrcMessage { command: IrcCommand::Numeric(353), params, ..} => self.parse_users(params),
-                            IrcMessage { command: IrcCommand::Ping, .. } => Self::ping_response(&mut conn, &message),
-                            IrcMessage { command: IrcCommand::PrivMsg, params, .. } => {
+                            IrcMessage { command: Command::Numeric(353), params, ..} => self.parse_users(params),
+                            IrcMessage { command: Command::Ping, .. } => Self::ping_response(&mut conn, &message),
+                            IrcMessage { command: Command::PrivMsg, params, .. } => {
                                 for param in params {
                                     match param {
-                                        IrcMessageParam::Message(message) => {
+                                        Param::Message(message) => {
                                             if message.contains('\u{1}') {
                                                 // CTCP message
                                                 Self::version_response(&mut conn, message)
@@ -90,7 +90,7 @@ impl Server {
                                     }
                                 }
                             },
-                            IrcMessage { command: IrcCommand::Version, .. } => conn.send_message("VERSION 123").unwrap(),
+                            IrcMessage { command: Command::Version, .. } => conn.send_message("VERSION 123").unwrap(),
                             _ => (),
                             
                         }
@@ -121,13 +121,13 @@ impl Server {
     }
 
     // This is a 353 message we need to parse
-    fn parse_users(&mut self, params: &Vec<IrcMessageParam>) {
+    fn parse_users(&mut self, params: &Vec<Param>) {
         // 2nd param is the channel name, 3rd and onwards are the users
         let channel_name = params[2].to_string();
         let channel = self.channels.entry(channel_name.to_string()).or_insert(Channel::new(&channel_name));
         println!("Channel: {:?}", channel);
         for param in params[3..].iter() {
-            if let IrcMessageParam::Unknown(user) = param {
+            if let Param::Unknown(user) = param {
                 let user = User::new(user);
                 channel.users.insert(user.nick.clone(), user);
             }
@@ -137,7 +137,7 @@ impl Server {
 
     fn ping_response(connection: &mut Connection, message: &IrcMessage) {
         let msg = message.params.iter().find_map(|param| {
-            if let IrcMessageParam::Message(ref msg) = param {
+            if let Param::Message(ref msg) = param {
                 Some(msg)
             } else {
                 None

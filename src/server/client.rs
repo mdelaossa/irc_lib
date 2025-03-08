@@ -1,6 +1,6 @@
 use std::{sync::mpsc::{Receiver, Sender}, thread::JoinHandle};
 
-use crate::message::{IrcMessage, IrcCommand, IrcMessageParam};
+use crate::message::{IrcMessage, Command, Param};
 use super::error::{ Result, Error };
 
 
@@ -38,8 +38,8 @@ impl Client {
         // Time to close our connection!
         if let Some(send) = &self.snd_channel {
             if let Ok(msg) = IrcMessage::builder()
-            .command(IrcCommand::Quit)
-            .param(IrcMessageParam::Message("Client shutting down".to_string()))
+            .command(Command::Quit)
+            .param(Param::Message("Client shutting down".to_string()))
             .build() {
                 send.send(msg).map_err(|_| Error::SendError)?
             }

@@ -2,7 +2,7 @@ use std::{fmt, str::FromStr};
 use super::error::{Error, Result};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct IrcMessage {
+pub struct IrcMessage{
     pub prefix: Option<Prefix>,
     pub command: Command,
     pub params: Vec<Param>,
@@ -436,6 +436,15 @@ mod tests {
     fn test_from_str() {
         let input = ":prefix JOIN #channel";
         let msg = IrcMessage::from_str(input).unwrap();
+        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(msg.command, Command::Join);
+        assert_eq!(msg.params, vec![Param::Channel("#channel".to_string())]);
+    }
+
+    #[test]
+    fn test_from_str_parse() {
+        let input = ":prefix JOIN #channel";
+        let msg : IrcMessage = input.parse().unwrap();
         assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
         assert_eq!(msg.command, Command::Join);
         assert_eq!(msg.params, vec![Param::Channel("#channel".to_string())]);
