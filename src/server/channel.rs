@@ -24,10 +24,10 @@ impl FromStr for Channel {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let name = if s.starts_with('#') {
-            &s[1..]
+        let name = if let Some(str) = s.strip_prefix('#') {
+            str
         } else {
-            &s[..]
+            s
         };
 
         Ok(Channel {

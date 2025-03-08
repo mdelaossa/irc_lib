@@ -156,7 +156,7 @@ impl IrcMessage {
             "WALLOPS" => Command::Wallops,
             "USERHOST" => Command::Userhost,
             "ISON" => Command::Ison,
-            _ if command_str.chars().all(|c| c.is_digit(10)) => {
+            _ if command_str.chars().all(|c| c.is_ascii_digit()) => {
                 Command::Numeric(command_str.parse().unwrap_or(0))
             }
             _ => Command::Unknown(command_str),
@@ -233,29 +233,6 @@ impl IrcMessage {
         }
 
         params
-    }
-
-    pub fn to_string(&self) -> String {
-        let mut result = String::new();
-        if let Some(ref prefix) = self.prefix {
-            result.push(':');
-            result.push_str(&prefix.to_string());
-            result.push(' ');
-        }
-        result.push_str(&self.command.to_string());
-        let mut msg = "".to_string();
-        for param in &self.params {
-            match param {
-                Param::Message(m) => msg = format!(" :{}", m),
-                _ => {
-                    result.push(' ');
-                    result.push_str(&param.to_string());
-                },
-            }
-
-        }
-        result.push_str(&msg);
-        result
     }
 
     pub fn builder() -> IrcMessageBuilder {
@@ -424,7 +401,26 @@ impl IrcMessageBuilder {
 
 impl fmt::Display for IrcMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        let mut result = String::new();
+        if let Some(ref prefix) = self.prefix {
+            result.push(':');
+            result.push_str(&prefix.to_string());
+            result.push(' ');
+        }
+        result.push_str(&self.command.to_string());
+        let mut msg = "".to_string();
+        for param in &self.params {
+            match param {
+                Param::Message(m) => msg = format!(" :{}", m),
+                _ => {
+                    result.push(' ');
+                    result.push_str(&param.to_string());
+                },
+            }
+
+        }
+        result.push_str(&msg);
+        write!(f, "{}", result)
     }
 }
 

@@ -79,14 +79,11 @@ impl Server {
                             IrcMessage { command: Command::Ping, .. } => Self::ping_response(&mut conn, &message),
                             IrcMessage { command: Command::PrivMsg, params, .. } => {
                                 for param in params {
-                                    match param {
-                                        Param::Message(message) => {
-                                            if message.contains('\u{1}') {
-                                                // CTCP message
-                                                Self::version_response(&mut conn, message)
-                                            }
+                                    if let Param::Message(message) = param {
+                                        if message.contains('\u{1}') {
+                                            // CTCP message
+                                            Self::version_response(&mut conn, message)
                                         }
-                                        _ => {}
                                     }
                                 }
                             },
@@ -121,7 +118,7 @@ impl Server {
     }
 
     // This is a 353 message we need to parse
-    fn parse_users(&mut self, params: &Vec<Param>) {
+    fn parse_users(&mut self, params: &[Param]) {
         // 2nd param is the channel name, 3rd and onwards are the users
         let channel_name = params[2].to_string();
         let channel = self.channels.entry(channel_name.to_string()).or_insert(Channel::new(&channel_name));
