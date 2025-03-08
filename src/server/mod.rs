@@ -1,8 +1,8 @@
 mod channel;
-mod user;
-mod error;
 mod client;
+mod error;
 mod server;
+mod user;
 
-pub use server::Server;
 pub use channel::Channel;
+pub use server::Server;

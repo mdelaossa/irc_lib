@@ -1,17 +1,4 @@
-use irc_lib::{IrcClient, IrcMessage, IrcPlugin, message};
-
-// Expected API:
-
-// impl IrcPLugin for STRUCT {
-    // fn message(IrcClient, IrcMessage) {
-        // IrcClient.send_message(some IrcMessage);
-        // IrcCllient.{channels, users}
-        // IrcChannel.users
-        // IrcChannel.send_message(some IrcMessage);
-    // }
-// }
-// 
-// irc_lib::Client::new(CONFIG).run(); // This loops/runs everything
+use irc_lib::{message, IrcClient, IrcMessage, IrcPlugin};
 
 #[derive(Debug)]
 struct BasicPlugin;
@@ -20,8 +7,13 @@ impl IrcPlugin for BasicPlugin {
         // Just an echo for now
         println!("Plugin received message: {:?}", message);
         match message {
-            IrcMessage { command: message::Command::PrivMsg, .. } => {
-                if let (Some(content), Some(message::Prefix::User { nick: source, .. })) = (message.get_message(), &message.prefix) {
+            IrcMessage {
+                command: message::Command::PrivMsg,
+                ..
+            } => {
+                if let (Some(content), Some(message::Prefix::User { nick: source, .. })) =
+                    (message.get_message(), &message.prefix)
+                {
                     let reply = format!("{}: {}", source, content);
                     let channel = message.get_channel().unwrap();
                     let msg = IrcMessage::builder()
@@ -34,8 +26,8 @@ impl IrcPlugin for BasicPlugin {
                         println!("Error sending message: {:?}", e)
                     }
                 }
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 }
@@ -55,14 +47,20 @@ fn main() {
         println!("Main thread received message: {:?}", message);
 
         // Echo!
-        if let IrcMessage { command: message::Command::PrivMsg, params, .. } = message {
-            let mut msg = IrcMessage::builder()
-                .command(message::Command::PrivMsg);
+        if let IrcMessage {
+            command: message::Command::PrivMsg,
+            params,
+            ..
+        } = message
+        {
+            let mut msg = IrcMessage::builder().command(message::Command::PrivMsg);
             for param in params {
                 msg = msg.param(param.to_owned());
             }
             let msg = msg.build().unwrap();
-            sender.send(msg).expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+            sender
+                .send(msg)
+                .expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
         }
     }
- }
+}

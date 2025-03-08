@@ -1,20 +1,23 @@
-use std::{io::{BufRead, BufReader, Write}, time::Duration};
 use std::net::TcpStream;
+use std::{
+    io::{BufRead, BufReader, Write},
+    time::Duration,
+};
 
+use super::error::{Error, Result};
 use crate::message::IrcMessage;
-use super::error::{Result, Error};
 
 #[derive(Debug)]
 pub(crate) struct Connection {
     socket: Option<BufReader<TcpStream>>,
-    buffer: String
+    buffer: String,
 }
 
 impl Connection {
     pub(crate) fn new() -> Connection {
         Connection {
             socket: None,
-            buffer: String::new()        
+            buffer: String::new(),
         }
     }
 
@@ -32,12 +35,12 @@ impl Connection {
                 println!("SENDING: {:?}", message);
                 stream.get_ref().write_all(bytes)?;
                 Ok(())
-            },
-            _ => Err(Error::NotConnected)
+            }
+            _ => Err(Error::NotConnected),
         }
     }
 
-    pub(crate) fn read(&mut self) -> Result<Option<IrcMessage>>{
+    pub(crate) fn read(&mut self) -> Result<Option<IrcMessage>> {
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer
@@ -58,13 +61,13 @@ impl Connection {
                             std::io::ErrorKind::WouldBlock => {
                                 // Timed out, return so we can do stuff
                                 Ok(None)
-                            },
-                            _ => Err(e.into())
+                            }
+                            _ => Err(e.into()),
                         }
                     }
                 }
-            },
-            None => Err(Error::NotConnected)
+            }
+            None => Err(Error::NotConnected),
         }
     }
 }

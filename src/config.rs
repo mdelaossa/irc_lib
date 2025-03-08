@@ -9,7 +9,7 @@ pub struct Config {
     pub(crate) nick: String,
     pub(crate) user: String,
     pub(crate) channels: HashMap<String, Channel>,
-    pub(crate) plugins: Vec<Box<dyn IrcPlugin>>
+    pub(crate) plugins: Vec<Box<dyn IrcPlugin>>,
 }
 
 impl Config {
@@ -19,13 +19,13 @@ impl Config {
             nick: "User".to_owned(),
             user: "rusty".to_owned(),
             channels: HashMap::new(),
-            plugins: Vec::new()
+            plugins: Vec::new(),
         }
     }
 
     pub fn nick(mut self, nick: &str) -> Self {
         self.nick = nick.to_owned();
-        
+
         self
     }
 

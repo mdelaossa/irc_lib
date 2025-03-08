@@ -1,17 +1,20 @@
-use crate::message::{Command, Param, IrcMessage};
 use crate::connection::Connection;
+use crate::message::{Command, IrcMessage, Param};
 use crate::{connection::ConnectionNegotiator, Config};
 
-use std::{collections::HashMap, sync::{
+use std::{
+    collections::HashMap,
+    sync::{
         mpsc::{self, Sender},
         Arc, Mutex,
-    }, thread};
-
+    },
+    thread,
+};
 
 use super::channel::Channel;
-use super::user::User;
-use super::error::{Error, Result};
 use super::client::Client;
+use super::error::{Error, Result};
+use super::user::User;
 
 #[derive(Debug)]
 pub struct Server {
@@ -19,7 +22,7 @@ pub struct Server {
     pub channels: HashMap<String, Channel>,
     config: Config,
     connection: Arc<Mutex<Connection>>,
-    sender: Option<Sender<IrcMessage>>
+    sender: Option<Sender<IrcMessage>>,
 }
 
 impl Server {
@@ -39,9 +42,14 @@ impl Server {
 
     pub fn send_message(&self, message: IrcMessage) -> Result<()> {
         if let Some(sender) = &self.sender {
-            sender.send(message).map_err(|r| Error::WriteError(self.address.clone(), r.to_string()))
+            sender
+                .send(message)
+                .map_err(|r| Error::WriteError(self.address.clone(), r.to_string()))
         } else {
-            Err(Error::WriteError(self.address.clone(), "Not connected".to_string()))
+            Err(Error::WriteError(
+                self.address.clone(),
+                "Not connected".to_string(),
+            ))
         }
     }
 
@@ -75,9 +83,20 @@ impl Server {
                         println!("RECEIVED: {:?}", message);
 
                         match &message {
-                            IrcMessage { command: Command::Numeric(353), params, ..} => self.parse_users(params),
-                            IrcMessage { command: Command::Ping, .. } => Self::ping_response(&mut conn, &message),
-                            IrcMessage { command: Command::PrivMsg, params, .. } => {
+                            IrcMessage {
+                                command: Command::Numeric(353),
+                                params,
+                                ..
+                            } => self.parse_users(params),
+                            IrcMessage {
+                                command: Command::Ping,
+                                ..
+                            } => Self::ping_response(&mut conn, &message),
+                            IrcMessage {
+                                command: Command::PrivMsg,
+                                params,
+                                ..
+                            } => {
                                 for param in params {
                                     if let Param::Message(message) = param {
                                         if message.contains('\u{1}') {
@@ -86,17 +105,18 @@ impl Server {
                                         }
                                     }
                                 }
-                            },
-                            IrcMessage { command: Command::Version, .. } => conn.send_message("VERSION 123").unwrap(),
+                            }
+                            IrcMessage {
+                                command: Command::Version,
+                                ..
+                            } => conn.send_message("VERSION 123").unwrap(),
                             _ => (),
-                            
                         }
                         thread_snd.send(message.clone()).ok();
                         for plugin in self.config.plugins.iter() {
                             plugin.message(&self, &message)
                         }
-
-                    },
+                    }
                     Ok(None) => {
                         if let Some(message) = negotiator.next() {
                             let _ = conn.send_message(&message);
@@ -105,7 +125,7 @@ impl Server {
                     Err(e) => {
                         println!("Error reading from connection: {:?}", e);
                         break;
-                    },                
+                    }
                 }
             }
         });
@@ -121,7 +141,10 @@ impl Server {
     fn parse_users(&mut self, params: &[Param]) {
         // 2nd param is the channel name, 3rd and onwards are the users
         let channel_name = params[2].to_string();
-        let channel = self.channels.entry(channel_name.to_string()).or_insert(Channel::new(&channel_name));
+        let channel = self
+            .channels
+            .entry(channel_name.to_string())
+            .or_insert(Channel::new(&channel_name));
         println!("Channel: {:?}", channel);
         for param in params[3..].iter() {
             if let Param::Unknown(user) = param {
@@ -140,23 +163,15 @@ impl Server {
                 None
             }
         });
-    
+
         if let Some(msg) = msg {
-            connection
-            .send_message(&format!(
-                "PONG :{}",
-                msg
-            ))
-            .unwrap()
+            connection.send_message(&format!("PONG :{}", msg)).unwrap()
         }
     }
-    
+
     fn version_response(connection: &mut Connection, message: &str) {
         connection
-            .send_message(&format!(
-                "NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}",
-                message
-            ))
+            .send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message))
             .unwrap();
     }
 }

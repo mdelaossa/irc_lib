@@ -1,9 +1,9 @@
-use crate::{Config, server::Channel};
+use crate::{server::Channel, Config};
 
 pub struct Negotiator {
     channels: std::collections::hash_map::IntoIter<String, Channel>,
     done: bool,
-    messages: std::vec::IntoIter<String>
+    messages: std::vec::IntoIter<String>,
 }
 
 impl Negotiator {
@@ -15,8 +15,9 @@ impl Negotiator {
                 "CAP LS 302".to_string(),
                 format!("USER {} 0 * None", config.user),
                 format!("NICK {}", config.nick),
-                "CAP END".to_string()
-            ].into_iter()
+                "CAP END".to_string(),
+            ]
+            .into_iter(),
         }
     }
 }
@@ -25,14 +26,16 @@ impl Iterator for Negotiator {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.done { return None }
+        if self.done {
+            return None;
+        }
 
         if let Some(n) = self.messages.next() {
-            return Some(n)
+            return Some(n);
         }
 
         if let Some((_, n)) = self.channels.next() {
-            return Some(format!("JOIN {}", n))
+            return Some(format!("JOIN {}", n));
         }
 
         self.done = true;

@@ -20,10 +20,10 @@ impl User {
             Some('%') => UserType::HalfOp,
             _ => UserType::Regular,
         };
-        
+
         User {
             nick: nick.to_string(),
-            r#type: perm
+            r#type: perm,
         }
     }
 

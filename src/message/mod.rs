@@ -1,5 +1,5 @@
-mod irc_message;
 mod error;
+mod irc_message;
 
 pub use error::Error;
 pub use irc_message::*;

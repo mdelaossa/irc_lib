@@ -5,7 +5,7 @@ use super::user::User;
 #[derive(Clone, Debug, Default)]
 pub struct Channel {
     pub name: String,
-    pub users: HashMap<String, User>
+    pub users: HashMap<String, User>,
 }
 
 impl Channel {

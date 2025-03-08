@@ -1,8 +1,8 @@
-use std::{fmt, str::FromStr};
 use super::error::{Error, Result};
+use std::{fmt, str::FromStr};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct IrcMessage{
+pub struct IrcMessage {
     pub prefix: Option<Prefix>,
     pub command: Command,
     pub params: Vec<Param>,
@@ -415,9 +415,8 @@ impl fmt::Display for IrcMessage {
                 _ => {
                     result.push(' ');
                     result.push_str(&param.to_string());
-                },
+                }
             }
-
         }
         result.push_str(&msg);
         write!(f, "{}", result)
@@ -432,7 +431,14 @@ mod tests {
     fn test_from_str() {
         let input = ":prefix JOIN #channel";
         let msg = IrcMessage::from_str(input).unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Join);
         assert_eq!(msg.params, vec![Param::Channel("#channel".to_string())]);
     }
@@ -440,8 +446,15 @@ mod tests {
     #[test]
     fn test_from_str_parse() {
         let input = ":prefix JOIN #channel";
-        let msg : IrcMessage = input.parse().unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        let msg: IrcMessage = input.parse().unwrap();
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Join);
         assert_eq!(msg.params, vec![Param::Channel("#channel".to_string())]);
     }
@@ -449,7 +462,11 @@ mod tests {
     #[test]
     fn test_to_string() {
         let msg = IrcMessage::new(
-            Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }),
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None,
+            }),
             Command::Join,
             vec![Param::Channel("#channel".to_string())],
         );
@@ -464,7 +481,14 @@ mod tests {
             .param(Param::Channel("#channel".to_string()))
             .build()
             .unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Join);
         assert_eq!(msg.params, vec![Param::Channel("#channel".to_string())]);
         assert_eq!(msg.to_string(), ":prefix JOIN #channel");
@@ -473,7 +497,11 @@ mod tests {
     #[test]
     fn test_display() {
         let msg = IrcMessage::new(
-            Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }),
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None,
+            }),
             Command::Join,
             vec![Param::Channel("#channel".to_string())],
         );
@@ -484,7 +512,14 @@ mod tests {
     fn test_privmsg_with_message() {
         let input = ":nick!user@some.server PRIVMSG #channel :Hello, world!";
         let msg = IrcMessage::from_str(input).unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "nick".to_string(), user: Some("user".to_string()), host: Some("some.server".to_string()) }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "nick".to_string(),
+                user: Some("user".to_string()),
+                host: Some("some.server".to_string())
+            })
+        );
         assert_eq!(msg.command, Command::PrivMsg);
         assert_eq!(
             msg.params,
@@ -504,14 +539,24 @@ mod tests {
             .param(Param::Channel("#channel".to_string()))
             .build()
             .unwrap();
-        assert_eq!(msg.to_string(), ":nick!user@some.server PRIVMSG #channel :Hello, world!");
+        assert_eq!(
+            msg.to_string(),
+            ":nick!user@some.server PRIVMSG #channel :Hello, world!"
+        );
     }
 
     #[test]
     fn test_notice_with_message() {
         let input = ":prefix NOTICE #channel :Hello, world!";
         let msg = IrcMessage::from_str(input).unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Notice);
         assert_eq!(
             msg.params,
@@ -573,7 +618,14 @@ mod tests {
     fn test_numeric_command() {
         let input = ":prefix 001 Welcome to the IRC network";
         let msg = IrcMessage::from_str(input).unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Numeric(1));
         assert_eq!(
             msg.params,
@@ -591,7 +643,14 @@ mod tests {
     fn test_unknown_command() {
         let input = ":prefix UNKNOWNCMD some parameters";
         let msg = IrcMessage::from_str(input).unwrap();
-        assert_eq!(msg.prefix, Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }));
+        assert_eq!(
+            msg.prefix,
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None
+            })
+        );
         assert_eq!(msg.command, Command::Unknown("UNKNOWNCMD".to_string()));
         assert_eq!(
             msg.params,
@@ -605,7 +664,11 @@ mod tests {
     #[test]
     fn test_get_message() {
         let msg = IrcMessage::new(
-            Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }),
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None,
+            }),
             Command::PrivMsg,
             vec![
                 Param::Channel("#channel".to_string()),
@@ -618,7 +681,11 @@ mod tests {
     #[test]
     fn test_get_channel() {
         let msg = IrcMessage::new(
-            Some(Prefix::User { nick: "prefix".to_string(), user: None, host: None }),
+            Some(Prefix::User {
+                nick: "prefix".to_string(),
+                user: None,
+                host: None,
+            }),
             Command::PrivMsg,
             vec![
                 Param::Channel("#channel".to_string()),
