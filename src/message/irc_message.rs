@@ -1,6 +1,5 @@
-use std::fmt;
-
-use thiserror::Error;
+use std::{fmt, str::FromStr};
+use super::error::{Error, Result};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IrcMessage {
@@ -71,10 +70,12 @@ pub enum Param {
     Unknown(String),
 }
 
-#[derive(Error, Debug)]
-pub enum IrcMessageError {
-    #[error("missing command")]
-    MissingCommand,
+impl FromStr for IrcMessage {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        IrcMessage::from_str(s)
+    }
 }
 
 impl IrcMessage {
@@ -86,7 +87,7 @@ impl IrcMessage {
         }
     }
 
-    pub fn from_str(input: &str) -> Result<Self, IrcMessageError> {
+    fn from_str(input: &str) -> Result<Self> {
         println!("Parsing: {}", input);
         let mut parts = input.split_whitespace();
         let prefix = if input.starts_with(':') {
@@ -116,7 +117,7 @@ impl IrcMessage {
             None
         };
 
-        let command_str = parts.next().ok_or(IrcMessageError::MissingCommand)?.to_string();
+        let command_str = parts.next().ok_or(Error::MissingCommand)?.to_string();
         let command = match command_str.as_str() {
             "JOIN" => Command::Join,
             "PART" => Command::Part,
@@ -409,15 +410,14 @@ impl IrcMessageBuilder {
         self
     }
 
-    pub fn build(self) -> Result<IrcMessage, IrcMessageError> {
-        if let Some(command) = self.command {
-            Ok(IrcMessage {
+    pub fn build(self) -> Result<IrcMessage> {
+        match self.command {
+            Some(command) => Ok(IrcMessage {
                 prefix: self.prefix,
                 command,
                 params: self.params,
-            })
-        } else {
-            Err(IrcMessageError::MissingCommand)
+            }),
+            None => Err(Error::MissingCommand),
         }
     }
 }

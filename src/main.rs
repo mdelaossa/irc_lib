@@ -1,5 +1,4 @@
-use irc_lib::{IrcClient, IrcMessage, IrcPlugin};
-use irc_lib::message;
+use irc_lib::{IrcClient, IrcMessage, IrcPlugin, IrcCommand, IrcMessageParam, IrcMessagePrefix};
 
 // Expected API:
 
@@ -21,14 +20,14 @@ impl IrcPlugin for BasicPlugin {
         // Just an echo for now
         println!("Plugin received message: {:?}", message);
         match message {
-            IrcMessage { command: message::Command::PrivMsg, .. } => {
-                if let (Some(content), Some(message::Prefix::User { nick: source, .. })) = (message.get_message(), &message.prefix) {
+            IrcMessage { command: IrcCommand::PrivMsg, .. } => {
+                if let (Some(content), Some(IrcMessagePrefix::User { nick: source, .. })) = (message.get_message(), &message.prefix) {
                     let reply = format!("{}: {}", source, content);
                     let channel = message.get_channel().unwrap();
                     let msg = IrcMessage::builder()
-                        .command(message::Command::PrivMsg)
-                        .param(message::Param::Channel(channel.to_string()))
-                        .param(message::Param::Message(reply))
+                        .command(IrcCommand::PrivMsg)
+                        .param(IrcMessageParam::Channel(channel.to_string()))
+                        .param(IrcMessageParam::Message(reply))
                         .build()
                         .unwrap();
                     if let Err(e) = server.send_message(msg) {
@@ -56,9 +55,9 @@ fn main() {
         println!("Main thread received message: {:?}", message);
 
         // Echo!
-        if let IrcMessage { command: message::Command::PrivMsg, params, .. } = message {
+        if let IrcMessage { command: IrcCommand::PrivMsg, params, .. } = message {
             let mut msg = IrcMessage::builder()
-                .command(message::Command::PrivMsg);
+                .command(IrcCommand::PrivMsg);
             for param in params {
                 msg = msg.param(param.to_owned());
             }
