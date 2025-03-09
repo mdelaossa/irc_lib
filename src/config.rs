@@ -52,3 +52,24 @@ impl Config {
         Server::new(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config() {
+        let config = Config::new("irc.example.com")
+            .nick("rusty")
+            .user("rusty")
+            .channel("#channel")
+            .channel("#other");
+
+        assert_eq!(config.server, "irc.example.com");
+        assert_eq!(config.nick, "rusty");
+        assert_eq!(config.user, "rusty");
+        assert_eq!(config.channels.len(), 2);
+
+        config.build();
+    }
+}
