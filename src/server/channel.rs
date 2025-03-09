@@ -36,3 +36,23 @@ impl FromStr for Channel {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_str() {
+        let channel: Channel = "#channel".parse().unwrap();
+        assert_eq!(channel.name, "channel");
+
+        let channel: Channel = "channel".parse().unwrap();
+        assert_eq!(channel.name, "channel");
+    }
+
+    #[test]
+    fn test_display() {
+        let channel: Channel = "channel".parse().unwrap();
+        assert_eq!(format!("{}", channel), "#channel");
+    }
+}
