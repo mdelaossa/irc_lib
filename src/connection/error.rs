@@ -11,7 +11,7 @@ pub enum Error {
     #[allow(dead_code)]
     Io(std::io::Error),
     #[from]
-    MessageParsingError(MessageError),
+    MessageParsing(MessageError),
     NotConnected,
     ConnectionClosed,
 }

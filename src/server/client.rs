@@ -44,7 +44,7 @@ impl Client {
                 .param(Param::Message("Client shutting down".to_string()))
                 .build()
             {
-                send.send(msg).map_err(|_| Error::SendError)?
+                send.send(msg).map_err(|_| Error::Send)?
             }
         }
 

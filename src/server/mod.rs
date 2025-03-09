@@ -1,8 +1,8 @@
 mod channel;
 mod client;
 mod error;
-mod server;
+mod irc_server;
 mod user;
 
 pub use channel::Channel;
-pub use server::Server;
+pub use irc_server::Server;

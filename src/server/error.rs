@@ -2,10 +2,10 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    ConnectionError(String),
-    ReadError(String),
-    WriteError(String, String),
-    SendError,
+    Connection(String),
+    Read(String),
+    Write(String, String),
+    Send,
 }
 
 // region:    --- Error Boilerplate

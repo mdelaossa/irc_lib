@@ -44,9 +44,9 @@ impl Server {
         if let Some(sender) = &self.sender {
             sender
                 .send(message)
-                .map_err(|r| Error::WriteError(self.address.clone(), r.to_string()))
+                .map_err(|r| Error::Write(self.address.clone(), r.to_string()))
         } else {
-            Err(Error::WriteError(
+            Err(Error::Write(
                 self.address.clone(),
                 "Not connected".to_string(),
             ))
