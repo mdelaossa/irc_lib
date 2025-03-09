@@ -1,12 +1,12 @@
 use crate::connection::Connection;
 use crate::message::{Command, IrcMessage, Param};
-use crate::{connection::ConnectionNegotiator, Config};
+use crate::{Config, connection::ConnectionNegotiator};
 
 use std::{
     collections::HashMap,
     sync::{
-        mpsc::{self, Sender},
         Arc, Mutex,
+        mpsc::{self, Sender},
     },
     thread,
 };
@@ -157,7 +157,7 @@ impl Server {
 
     fn ping_response(connection: &mut Connection, message: &IrcMessage) {
         let msg = message.params.iter().find_map(|param| {
-            if let Param::Message(ref msg) = param {
+            if let Param::Message(msg) = param {
                 Some(msg)
             } else {
                 None

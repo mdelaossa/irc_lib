@@ -1,6 +1,19 @@
 use super::error::{Error, Result};
 use std::{fmt, str::FromStr};
 
+/// Represents an IRC message.
+///
+/// ```rust
+/// use irc_lib::IrcMessage;
+/// use irc_lib::message::{Param, Command, Prefix};
+///
+/// let msg: IrcMessage = ":nick!user@host PRIVMSG #channel :Hello, world!".parse()?;
+///
+/// assert_eq!(msg.prefix, Some(Prefix::User { nick: "nick".to_string(), user: Some("user".to_string()), host: Some("host".to_string()) }));
+/// assert_eq!(msg.command, Command::PrivMsg);
+/// assert_eq!(msg.params, vec![Param::Channel("#channel".to_string()), Param::Message("Hello, world!".to_string())]);
+/// # Ok::<(), irc_lib::message::Error>(())
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IrcMessage {
     pub prefix: Option<Prefix>,
@@ -241,7 +254,7 @@ impl IrcMessage {
 
     pub fn get_message(&self) -> Option<&String> {
         self.params.iter().find_map(|param| {
-            if let Param::Message(ref msg) = param {
+            if let Param::Message(msg) = param {
                 Some(msg)
             } else {
                 None
@@ -251,7 +264,7 @@ impl IrcMessage {
 
     pub fn get_channel(&self) -> Option<&String> {
         self.params.iter().find_map(|param| {
-            if let Param::Channel(ref ch) = param {
+            if let Param::Channel(ch) = param {
                 Some(ch)
             } else {
                 None
@@ -337,6 +350,19 @@ impl fmt::Display for Param {
     }
 }
 
+/// Builder for `IrcMessage`.
+/// ```
+/// use irc_lib::IrcMessage;
+/// let msg = IrcMessage::builder()
+///     .prefix("prefix")
+///     .command(irc_lib::message::Command::PrivMsg)
+///     .param(irc_lib::message::Param::Channel("#channel".to_string()))
+///     .param(irc_lib::message::Param::Message("Hello, world!".to_string()))
+///     .build()?;
+/// assert_eq!(msg.to_string(), ":prefix PRIVMSG #channel :Hello, world!");
+/// # Ok::<(), irc_lib::message::Error>(())
+/// ```
+#[derive(Debug, Default)]
 pub struct IrcMessageBuilder {
     prefix: Option<Prefix>,
     command: Option<Command>,

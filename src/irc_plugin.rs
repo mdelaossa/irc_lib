@@ -1,4 +1,4 @@
-use crate::{message::IrcMessage, Server};
+use crate::{Server, message::IrcMessage};
 
 use std::fmt::Debug;
 

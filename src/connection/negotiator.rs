@@ -1,4 +1,4 @@
-use crate::{server::Channel, Config};
+use crate::{Config, server::Channel};
 
 pub struct Negotiator {
     channels: std::collections::hash_map::IntoIter<String, Channel>,

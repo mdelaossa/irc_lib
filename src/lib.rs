@@ -10,3 +10,7 @@ pub use message::IrcMessage;
 pub use server::Server;
 
 pub(crate) use config::Config;
+
+#[doc = include_str!("../README.md")]
+#[cfg(doctest)]
+pub struct ReadmeDoctests;

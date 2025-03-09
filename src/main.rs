@@ -1,4 +1,4 @@
-use irc_lib::{message, IrcClient, IrcMessage, IrcPlugin};
+use irc_lib::{IrcClient, IrcMessage, IrcPlugin, message};
 
 #[derive(Debug)]
 struct BasicPlugin;
