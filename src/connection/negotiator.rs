@@ -42,3 +42,28 @@ impl Iterator for Negotiator {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_negotiator() {
+        let config = Config::new("irc.example.com")
+            .nick("rusty")
+            .user("rusty")
+            .channel("#channel")
+            .channel("#other");
+
+        let mut negotiator = Negotiator::new(&config);
+
+        assert_eq!(negotiator.next(), Some("CAP LS 302".to_string()));
+        assert_eq!(negotiator.next(), Some("USER rusty 0 * None".to_string()));
+        assert_eq!(negotiator.next(), Some("NICK rusty".to_string()));
+        assert_eq!(negotiator.next(), Some("CAP END".to_string()));
+        //assert that it joins the correct channels, in any order
+        assert!(matches!(negotiator.next(), Some(n) if n == "JOIN #channel" || n == "JOIN #other"));
+        assert!(matches!(negotiator.next(), Some(n) if n == "JOIN #channel" || n == "JOIN #other"));
+        assert_eq!(negotiator.next(), None);
+    }
+}
