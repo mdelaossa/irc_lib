@@ -16,6 +16,7 @@ use super::client::Client;
 use super::error::{Error, Result};
 use super::user::User;
 
+#[derive(Debug)]
 pub struct Server {
     pub address: String,
     pub channels: HashMap<String, Channel>,

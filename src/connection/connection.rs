@@ -16,7 +16,7 @@ pub(crate) struct Connection {
 }
 
 #[automock]
-pub trait IrcConnection: Send {
+pub trait IrcConnection: Send + core::fmt::Debug {
     fn connect(&mut self, address: String) -> Result<()>;
     fn send_message(&mut self, message: &str) -> Result<()>;
     fn read(&mut self) -> Result<Option<IrcMessage>>;
