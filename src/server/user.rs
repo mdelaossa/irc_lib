@@ -4,7 +4,7 @@ pub struct User {
     pub r#type: UserType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UserType {
     Regular,
     Op,
@@ -31,9 +31,36 @@ impl User {
         let mut chars = input.chars();
         let prefix = match chars.next() {
             Some(c) if c == '@' || c == '%' => Some(c),
-            Some(_c) => None,
+            Some(_c) => return (None, input),
             None => return (None, ""),
         };
         (prefix, chars.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_nick() {
+        assert_eq!(User::parse_nick("nick"), (None, "nick"));
+        assert_eq!(User::parse_nick("@nick"), (Some('@'), "nick"));
+        assert_eq!(User::parse_nick("%nick"), (Some('%'), "nick"));
+    }
+
+    #[test]
+    fn test_new() {
+        let user = User::new("nick");
+        assert_eq!(user.nick, "nick");
+        assert_eq!(user.r#type, UserType::Regular);
+
+        let user = User::new("@nick");
+        assert_eq!(user.nick, "nick");
+        assert_eq!(user.r#type, UserType::Op);
+
+        let user = User::new("%nick");
+        assert_eq!(user.nick, "nick");
+        assert_eq!(user.r#type, UserType::HalfOp);
     }
 }
