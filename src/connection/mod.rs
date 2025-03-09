@@ -1,6 +1,6 @@
 mod connection;
-mod error;
+pub(crate) mod error;
 mod negotiator;
 
-pub(crate) use connection::Connection;
+pub(crate) use connection::*;
 pub(crate) use negotiator::Negotiator as ConnectionNegotiator;

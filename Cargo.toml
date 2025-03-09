@@ -12,3 +12,4 @@ repository = "https://github.com/mdelaossa/irc_lib"
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["full"]}
+mockall = "0.13.1"

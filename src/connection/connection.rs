@@ -4,6 +4,8 @@ use std::{
     time::Duration,
 };
 
+use mockall::automock;
+
 use super::error::{Error, Result};
 use crate::message::IrcMessage;
 
@@ -13,6 +15,13 @@ pub(crate) struct Connection {
     buffer: String,
 }
 
+#[automock]
+pub trait IrcConnection: Send {
+    fn connect(&mut self, address: String) -> Result<()>;
+    fn send_message(&mut self, message: &str) -> Result<()>;
+    fn read(&mut self) -> Result<Option<IrcMessage>>;
+}
+
 impl Connection {
     pub(crate) fn new() -> Connection {
         Connection {
@@ -20,15 +29,17 @@ impl Connection {
             buffer: String::new(),
         }
     }
+}
 
-    pub(crate) fn connect(&mut self, address: String) -> Result<()> {
+impl IrcConnection for Connection {
+    fn connect(&mut self, address: String) -> Result<()> {
         let stream = TcpStream::connect(address)?;
         stream.set_read_timeout(Some(Duration::from_millis(1500)))?;
         self.socket = Some(BufReader::new(stream));
         Ok(())
     }
 
-    pub(crate) fn send_message(&mut self, message: &str) -> Result<()> {
+    fn send_message(&mut self, message: &str) -> Result<()> {
         match &mut self.socket {
             Some(stream) => {
                 let bytes = &[message.as_bytes(), b"\r\n"].concat();
@@ -40,7 +51,7 @@ impl Connection {
         }
     }
 
-    pub(crate) fn read(&mut self) -> Result<Option<IrcMessage>> {
+    fn read(&mut self) -> Result<Option<IrcMessage>> {
         match &mut self.socket {
             Some(stream) => {
                 // Get rid of any old messages in the buffer

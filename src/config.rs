@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::connection::Connection;
 use crate::server::Channel;
 use crate::{IrcPlugin, Server};
 
@@ -49,7 +50,7 @@ impl Config {
     }
 
     pub fn build(self) -> Server {
-        Server::new(self)
+        Server::new(self, Box::new(Connection::new()))
     }
 }
 

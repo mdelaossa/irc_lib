@@ -1,4 +1,4 @@
-use crate::connection::Connection;
+use crate::connection::IrcConnection;
 use crate::message::{Command, IrcMessage, Param};
 use crate::{Config, connection::ConnectionNegotiator};
 
@@ -16,21 +16,20 @@ use super::client::Client;
 use super::error::{Error, Result};
 use super::user::User;
 
-#[derive(Debug)]
 pub struct Server {
     pub address: String,
     pub channels: HashMap<String, Channel>,
     config: Config,
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<Mutex<Box<dyn IrcConnection>>>,
     sender: Option<Sender<IrcMessage>>,
 }
 
 impl Server {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, connection: Box<dyn IrcConnection>) -> Self {
         Self {
             address: config.server.clone(),
             channels: config.channels.clone(),
-            connection: Arc::new(Mutex::new(Connection::new())),
+            connection: Arc::new(Mutex::new(connection)),
             sender: None,
             config,
         }
@@ -91,7 +90,7 @@ impl Server {
                             IrcMessage {
                                 command: Command::Ping,
                                 ..
-                            } => Self::ping_response(&mut conn, &message),
+                            } => Self::ping_response(&mut **conn, &message),
                             IrcMessage {
                                 command: Command::PrivMsg,
                                 params,
@@ -101,7 +100,7 @@ impl Server {
                                     if let Param::Message(message) = param {
                                         if message.contains('\u{1}') {
                                             // CTCP message
-                                            Self::version_response(&mut conn, message)
+                                            Self::version_response(&mut **conn, message)
                                         }
                                     }
                                 }
@@ -155,7 +154,7 @@ impl Server {
         println!("Channel: {:?}", channel);
     }
 
-    fn ping_response(connection: &mut Connection, message: &IrcMessage) {
+    fn ping_response(connection: &mut dyn IrcConnection, message: &IrcMessage) {
         let msg = message.params.iter().find_map(|param| {
             if let Param::Message(msg) = param {
                 Some(msg)
@@ -169,9 +168,124 @@ impl Server {
         }
     }
 
-    fn version_response(connection: &mut Connection, message: &str) {
+    fn version_response(connection: &mut dyn IrcConnection, message: &str) {
         connection
             .send_message(&format!("NOTICE :{} PRIVMSG :\u{1}VERSION 1\u{1}", message))
             .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::connection::MockIrcConnection;
+    use crate::message::{Command, IrcMessage, Param};
+    use std::time::Duration;
+
+    #[test]
+    fn test_ping_response() {
+        let mut mock_conn = MockIrcConnection::new();
+        mock_conn
+            .expect_send_message()
+            .with(mockall::predicate::eq("PONG :12345"))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let message = IrcMessage {
+            prefix: None,
+            command: Command::Ping,
+            params: vec![Param::Message("12345".to_string())],
+        };
+
+        Server::ping_response(&mut mock_conn, &message);
+    }
+
+    #[test]
+    fn test_version_response() {
+        let mut mock_conn = MockIrcConnection::new();
+        mock_conn
+            .expect_send_message()
+            .with(mockall::predicate::eq(
+                "NOTICE :test_user PRIVMSG :\u{1}VERSION 1\u{1}",
+            ))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let message = "test_user";
+
+        Server::version_response(&mut mock_conn, message);
+    }
+
+    #[test]
+    fn test_parse_users() {
+        let config = Config {
+            nick: "test".to_string(),
+            user: "test".to_string(),
+            server: "localhost".to_string(),
+            channels: HashMap::new(),
+            plugins: vec![],
+        };
+        let mock_conn = MockIrcConnection::new();
+        let mut server = Server::new(config, Box::new(mock_conn));
+
+        let params = vec![
+            Param::Unknown("".to_string()),
+            Param::Unknown("".to_string()),
+            Param::Channel("#test".to_string()),
+            Param::Unknown("user1".to_string()),
+            Param::Unknown("user2".to_string()),
+        ];
+
+        server.parse_users(&params);
+
+        let channel = server.channels.get("#test").unwrap();
+        assert!(channel.users.contains_key("user1"));
+        assert!(channel.users.contains_key("user2"));
+    }
+
+    #[test]
+    fn test_connect_loop() {
+        let config = Config {
+            nick: "test".to_string(),
+            user: "test".to_string(),
+            server: "localhost".to_string(),
+            channels: HashMap::new(),
+            plugins: vec![],
+        };
+
+        let mut mock_conn = MockIrcConnection::new();
+        mock_conn
+            .expect_connect()
+            .with(mockall::predicate::eq("localhost".to_string()))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        mock_conn.expect_read().times(1).returning(|| {
+            Ok(Some(IrcMessage {
+                prefix: None,
+                command: Command::Ping,
+                params: vec![Param::Message("12345".to_string())],
+            }))
+        });
+
+        mock_conn
+            .expect_read()
+            .times(1)
+            .returning(|| Err(crate::connection::error::Error::ConnectionClosed));
+
+        mock_conn
+            .expect_send_message()
+            .with(mockall::predicate::eq("PONG :12345"))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let server = Server::new(config, Box::new(mock_conn));
+        let client = server.run();
+
+        // Give the thread some time to process
+        thread::sleep(Duration::from_millis(100));
+
+        // Ensure the client thread is still running
+        assert!(client.thread.is_some());
     }
 }
