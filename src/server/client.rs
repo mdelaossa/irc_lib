@@ -1,5 +1,8 @@
 use std::{
-    sync::mpsc::{Receiver, Sender},
+    sync::{
+        Arc, Condvar, Mutex,
+        mpsc::{Receiver, Sender},
+    },
     thread::JoinHandle,
 };
 
@@ -11,6 +14,7 @@ pub struct Client {
     pub(in crate::server) thread: Option<JoinHandle<()>>,
     pub(in crate::server) snd_channel: Option<Sender<IrcMessage>>,
     pub(in crate::server) rcv_channel: Option<Receiver<IrcMessage>>,
+    pub(in crate::server) ready: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl Drop for Client {
@@ -30,10 +34,21 @@ impl Drop for Client {
 
 impl Client {
     pub fn channels(&self) -> (&Sender<IrcMessage>, &Receiver<IrcMessage>) {
+        self.wait_ready();
+
         (
             self.snd_channel.as_ref().unwrap(),
             self.rcv_channel.as_ref().unwrap(),
         )
+    }
+
+    // Blocks until the connection is considered ready
+    fn wait_ready(&self) {
+        let (lock, cvar) = &*self.ready;
+        let mut started = lock.lock().unwrap();
+        while !*started {
+            started = cvar.wait(started).unwrap();
+        }
     }
 
     pub fn shutdown(self) -> Result<()> {

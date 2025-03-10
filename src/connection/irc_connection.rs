@@ -34,7 +34,7 @@ impl Connection {
 impl IrcConnection for Connection {
     fn connect(&mut self, address: String) -> Result<()> {
         let stream = TcpStream::connect(address)?;
-        stream.set_read_timeout(Some(Duration::from_millis(1500)))?;
+        stream.set_read_timeout(Some(Duration::from_millis(100)))?;
         self.socket = Some(BufReader::new(stream));
         Ok(())
     }

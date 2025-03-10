@@ -5,7 +5,7 @@ use crate::{Config, connection::ConnectionNegotiator};
 use std::{
     collections::HashMap,
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         mpsc::{self, Sender},
     },
     thread,
@@ -23,15 +23,18 @@ pub struct Server {
     config: Config,
     connection: Arc<Mutex<Box<dyn IrcConnection>>>,
     sender: Option<Sender<IrcMessage>>,
+    ready: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl Server {
     pub fn new(config: Config, connection: Box<dyn IrcConnection>) -> Self {
+        let ready = Arc::new((Mutex::new(false), Condvar::new()));
         Self {
             address: config.server.clone(),
             channels: config.channels.clone(),
             connection: Arc::new(Mutex::new(connection)),
             sender: None,
+            ready,
             config,
         }
     }
@@ -57,12 +60,13 @@ impl Server {
         let connection = self.connection.clone();
         let (thread_snd, rcv_channel) = mpsc::channel::<IrcMessage>();
         let (snd_channel, thread_rcv) = mpsc::channel::<IrcMessage>();
+        let ready = Arc::clone(&self.ready);
         self.sender = Some(snd_channel.clone());
 
         let thread = thread::spawn(move || {
             if let Ok(mut conn) = connection.lock() {
                 if conn.connect(self.address.clone()).is_err() {
-                    return;
+                    panic!("Could not connect to {}", self.address);
                 }
             }
 
@@ -74,8 +78,13 @@ impl Server {
                     Err(_) => continue,
                 };
 
-                for outgoing in thread_rcv.try_iter() {
-                    let _ = conn.send_message(&outgoing.to_string());
+                let (lock, cvar) = &*Arc::clone(&self.ready);
+                let mut conn_ready = lock.lock().unwrap();
+
+                if *conn_ready {
+                    for outgoing in thread_rcv.try_iter() {
+                        let _ = conn.send_message(&outgoing.to_string());
+                    }
                 }
 
                 match conn.read() {
@@ -83,6 +92,12 @@ impl Server {
                         println!("RECEIVED: {:?}", message);
 
                         match &message {
+                            IrcMessage {
+                                command: Command::Numeric(1..6),
+                                ..
+                            } => {
+                                self.negotiate(&mut negotiator, &mut **conn, &mut conn_ready, cvar)
+                            }
                             IrcMessage {
                                 command: Command::Numeric(353),
                                 params,
@@ -112,18 +127,19 @@ impl Server {
                             } => conn.send_message("VERSION 123").unwrap(),
                             _ => (),
                         }
+
                         thread_snd.send(message.clone()).ok();
                         for plugin in self.config.plugins.iter() {
                             plugin.message(&self, &message)
                         }
                     }
-                    Ok(None) => {
-                        if let Some(message) = negotiator.next() {
-                            let _ = conn.send_message(&message);
-                        }
-                    }
+                    Ok(None) => self.negotiate(&mut negotiator, &mut **conn, &mut conn_ready, cvar),
                     Err(e) => {
                         println!("Error reading from connection: {:?}", e);
+                        if !*conn_ready {
+                            *conn_ready = true;
+                            cvar.notify_all();
+                        }
                         break;
                     }
                 }
@@ -134,6 +150,25 @@ impl Server {
             thread: Some(thread),
             rcv_channel: Some(rcv_channel),
             snd_channel: Some(snd_channel),
+            ready,
+        }
+    }
+
+    fn negotiate(
+        &mut self,
+        negotiator: &mut ConnectionNegotiator,
+        conn: &mut dyn IrcConnection,
+        ready: &mut bool,
+        signal: &Condvar,
+    ) {
+        match negotiator.next() {
+            Some(message) => {
+                let _ = conn.send_message(&message);
+            }
+            None => {
+                *ready = true;
+                signal.notify_all();
+            }
         }
     }
 

@@ -8,9 +8,9 @@
 - Direct usage support
 - Full IRC message building
 
-[Examples](#examples)
+## Examples
 
-```rust
+```rust,no_run
 //! Base example
 use irc_lib::{message, IrcClient, IrcMessage};
 
@@ -43,7 +43,7 @@ let irc_client = IrcClient::new("irc.server.net:6667")
     }
 ```
 
-```rust
+```rust,no_run
 //! Plugin example
 
 use irc_lib::{message, Server, IrcClient, IrcMessage, IrcPlugin};
