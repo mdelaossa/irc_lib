@@ -1,7 +1,6 @@
 mod common;
 
 use irc_lib::{IrcClient, IrcMessage, message};
-use std::thread::sleep;
 use std::time::Duration;
 
 #[test]
@@ -161,9 +160,6 @@ fn send_multiple_messages() -> common::TestResult {
         sender
             .send(msg)
             .expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
-
-        // Wait for the message to be processed
-        sleep(Duration::from_millis(500));
     }
 
     // Verify that the messages were received by the server

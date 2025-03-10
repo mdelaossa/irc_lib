@@ -1,7 +1,8 @@
 mod test_plugins;
 
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::time::Duration;
 
 use irc_lib::{Client, IrcMessage};
 pub use test_plugins::*;
@@ -80,11 +81,11 @@ pub fn panic_hook() {
 
 pub fn clear_buffer(receiver: &Receiver<IrcMessage>) {
     loop {
-        let recv = receiver.try_recv();
+        let recv = receiver.recv_timeout(Duration::from_secs(1));
         match recv {
             Ok(_) => (),
-            Err(TryRecvError::Empty) => return,
-            Err(TryRecvError::Disconnected) => {
+            Err(RecvTimeoutError::Timeout) => return,
+            Err(RecvTimeoutError::Disconnected) => {
                 panic!("Receiver {:?} disconnected: {:?}", receiver, recv)
             }
         }
