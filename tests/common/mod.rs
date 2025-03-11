@@ -12,8 +12,6 @@ use testcontainers::{GenericImage, ImageExt};
 
 const IRCD_PORT: u16 = 6667;
 
-pub type TestResult = Result<(), Box<dyn std::error::Error>>;
-
 pub struct TestHarness {
     container: Option<testcontainers::Container<GenericImage>>,
     clients: Vec<Rc<Client>>,
@@ -27,7 +25,6 @@ impl TestHarness {
         }
     }
     pub fn start_ircd(&mut self) {
-        panic_hook();
         let container = GenericImage::new("linuxserver/ngircd", "version-27-r0")
             .with_exposed_port(IRCD_PORT.tcp())
             .with_wait_for(WaitFor::message_on_stdout("[ls.io-init] done."))
@@ -62,21 +59,15 @@ impl Drop for TestHarness {
         while let Some(client) = self.clients.pop() {
             match Rc::try_unwrap(client) {
                 Ok(client) => client.shutdown().unwrap(),
-                Err(err) => println!("======== Could not shutdown client {:?} ========", err),
+                Err(err) => eprintln!(
+                    "======== Could not shutdown client ========\n {:?} \n ===========================",
+                    err
+                ),
             }
         }
         // In case we couldn't do a graceful shutdown above... kill the container
         drop(self.container.take())
     }
-}
-
-pub fn panic_hook() {
-    let orig_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic_info| {
-        // invoke the default handler and exit the process
-        orig_hook(panic_info);
-        std::process::exit(1);
-    }));
 }
 
 pub fn clear_buffer(receiver: &Receiver<IrcMessage>) {

@@ -4,8 +4,7 @@ use irc_lib::{IrcClient, IrcMessage, message};
 use std::time::Duration;
 
 #[test]
-fn send_message() -> common::TestResult {
-    let mut errors = Vec::new();
+fn send_message() {
     let mut harness = common::TestHarness::new();
     harness.start_ircd();
     let host = &harness.get_host();
@@ -46,25 +45,14 @@ fn send_message() -> common::TestResult {
 
     // Verify that the message was actually sent
     if let Ok(received_msg) = receiver.recv_timeout(Duration::from_secs(2)) {
-        let expected = "Hello, world!";
-        let actual = received_msg.get_message().unwrap();
-        if expected != actual {
-            errors.push(format!("Expected: {}, but got {}", expected, actual))
-        }
+        assert_eq!("Hello, world!", received_msg.get_message().unwrap());
     } else {
-        errors.push(String::from("Did not receive message"));
+        panic!("Did not receive message");
     }
-
-    if !errors.is_empty() {
-        return Err(errors.join("; ").into());
-    }
-
-    Ok(())
 }
 
 #[test]
-fn plugin_replies_to_messages() -> common::TestResult {
-    let mut errors = Vec::new();
+fn plugin_replies_to_messages() {
     let mut harness = common::TestHarness::new();
     harness.start_ircd();
     let host = &harness.get_host();
@@ -105,25 +93,14 @@ fn plugin_replies_to_messages() -> common::TestResult {
 
     // Check for the echoed message
     if let Ok(received_msg) = sender_receiver.recv_timeout(Duration::from_secs(2)) {
-        let expected = "sender: Hello, world!";
-        let actual = received_msg.get_message().unwrap();
-        if expected != actual {
-            errors.push(format!("Expected: {}, but got {}", expected, actual))
-        }
+        assert_eq!("sender: Hello, world!", received_msg.get_message().unwrap());
     } else {
-        errors.push(String::from("Did not receive echoed message"));
+        panic!("Did not receive echoed message");
     }
-
-    if !errors.is_empty() {
-        return Err(errors.join("; ").into());
-    }
-
-    Ok(())
 }
 
 #[test]
-fn send_multiple_messages() -> common::TestResult {
-    let mut errors = Vec::new();
+fn send_multiple_messages() {
     let mut harness = common::TestHarness::new();
     harness.start_ircd();
     let host = &harness.get_host();
@@ -165,19 +142,12 @@ fn send_multiple_messages() -> common::TestResult {
     // Verify that the messages were received by the server
     for i in 0..5 {
         if let Ok(received_msg) = receiver.recv_timeout(Duration::from_secs(2)) {
-            let expected = &format!("Message {}", i);
-            let actual = received_msg.get_message().unwrap();
-            if expected != actual {
-                errors.push(format!("Expected: {}, but got {}", expected, actual))
-            }
+            assert_eq!(
+                &format!("Message {}", i),
+                received_msg.get_message().unwrap()
+            );
         } else {
-            errors.push(String::from("Did not receive message"));
+            panic!("Did not receive message");
         }
     }
-
-    if !errors.is_empty() {
-        return Err(errors.join("; ").into());
-    }
-
-    Ok(())
 }
