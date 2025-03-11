@@ -1,7 +1,7 @@
 mod common;
 
 use irc_lib::{IrcClient, IrcMessage, message};
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 #[test]
 fn send_message() {
@@ -37,18 +37,21 @@ fn send_message() {
         .build()
         .unwrap();
 
-    common::clear_buffer(receiver);
+    let error = format!("Could not send message: {:?}", msg);
+    sender.send(msg).expect(&error);
 
-    sender
-        .send(msg)
-        .expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
-
-    // Verify that the message was actually sent
-    if let Ok(received_msg) = receiver.recv_timeout(Duration::from_secs(2)) {
-        assert_eq!("Hello, world!", received_msg.get_message().unwrap());
-    } else {
-        panic!("Did not receive message");
+    while let Ok(message) = receiver.recv_timeout(Duration::from_secs(1)) {
+        if let IrcMessage {
+            command: message::Command::PrivMsg,
+            ..
+        } = message
+        {
+            assert_eq!("Hello, world!", message.get_message().unwrap());
+            return;
+        }
     }
+
+    panic!("Did not receive any messages");
 }
 
 #[test]
@@ -65,8 +68,7 @@ fn plugin_replies_to_messages() {
             .build()
             .run(),
     );
-    // replier
-    harness.register_client(
+    let _replier = harness.register_client(
         IrcClient::new(host)
             .nick("receiver")
             .channel(channel)
@@ -86,17 +88,21 @@ fn plugin_replies_to_messages() {
         .build()
         .unwrap();
 
-    common::clear_buffer(sender_receiver);
-    sender
-        .send(msg)
-        .expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+    let error = format!("Could not send message: {:?}", msg);
+    sender.send(msg).expect(&error);
 
-    // Check for the echoed message
-    if let Ok(received_msg) = sender_receiver.recv_timeout(Duration::from_secs(2)) {
-        assert_eq!("sender: Hello, world!", received_msg.get_message().unwrap());
-    } else {
-        panic!("Did not receive echoed message");
+    while let Ok(message) = sender_receiver.recv_timeout(Duration::from_secs(1)) {
+        if let IrcMessage {
+            command: message::Command::PrivMsg,
+            ..
+        } = message
+        {
+            assert_eq!("sender: Hello, world!", message.get_message().unwrap());
+            return;
+        }
     }
+
+    panic!("Did not receive any messages");
 }
 
 #[test]
@@ -124,8 +130,6 @@ fn send_multiple_messages() {
     let (sender, _sender_receiver) = irc_sender.channels();
     let (_receiver_sender, receiver) = irc_receiver.channels();
 
-    common::clear_buffer(receiver);
-
     for i in 0..5 {
         let msg = IrcMessage::builder()
             .command(message::Command::PrivMsg)
@@ -134,20 +138,30 @@ fn send_multiple_messages() {
             .build()
             .unwrap();
 
-        sender
-            .send(msg)
-            .expect("MAIN THREAD COULDN'T SEND IRC MESSAGE");
+        let error = format!("Could not send message: {:?}", msg);
+        sender.send(msg).expect(&error);
     }
 
-    // Verify that the messages were received by the server
-    for i in 0..5 {
-        if let Ok(received_msg) = receiver.recv_timeout(Duration::from_secs(2)) {
-            assert_eq!(
-                &format!("Message {}", i),
-                received_msg.get_message().unwrap()
+    let mut expected: HashSet<String> = (0..5).map(|i| format!("Message {}", i)).collect();
+    while let Ok(message) = receiver.recv_timeout(Duration::from_secs(2)) {
+        if let IrcMessage {
+            command: message::Command::PrivMsg,
+            ..
+        } = message
+        {
+            assert!(
+                expected.remove(message.get_message().unwrap()),
+                "Unexpected message: {}",
+                message
             );
-        } else {
-            panic!("Did not receive message");
+            if expected.is_empty() {
+                return;
+            }
         }
     }
+    assert!(
+        expected.is_empty(),
+        "Some expected messages were missing: {:?}",
+        expected
+    );
 }

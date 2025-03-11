@@ -4,7 +4,6 @@ use irc_lib::{IrcMessage, IrcPlugin, message};
 pub struct EchoPlugin;
 impl IrcPlugin for EchoPlugin {
     fn message(&self, server: &irc_lib::Server, message: &IrcMessage) {
-        println!("Plugin received message: {:?}", message);
         if let IrcMessage {
             command: message::Command::PrivMsg,
             ..

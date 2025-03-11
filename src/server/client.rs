@@ -6,7 +6,6 @@ use std::{
     thread::JoinHandle,
 };
 
-use super::error::{Error, Result};
 use crate::message::{Command, IrcMessage, Param};
 
 #[derive(Debug)]
@@ -51,7 +50,7 @@ impl Client {
         }
     }
 
-    pub fn shutdown(self) -> Result<()> {
+    pub fn shutdown(self) {
         // Time to close our connection!
         if let Some(send) = &self.snd_channel {
             if let Ok(msg) = IrcMessage::builder()
@@ -59,11 +58,10 @@ impl Client {
                 .param(Param::Message("Client shutting down".to_string()))
                 .build()
             {
-                let _ = send.send(msg).map_err(|_| Error::Send);
+                let _ = send.send(msg);
             }
         }
 
         drop(self);
-        Ok(())
     }
 }

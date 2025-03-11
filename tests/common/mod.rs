@@ -1,10 +1,8 @@
 mod test_plugins;
 
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::time::Duration;
 
-use irc_lib::{Client, IrcMessage};
+use irc_lib::Client;
 pub use test_plugins::*;
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::SyncRunner;
@@ -58,7 +56,7 @@ impl Drop for TestHarness {
     fn drop(&mut self) {
         while let Some(client) = self.clients.pop() {
             match Rc::try_unwrap(client) {
-                Ok(client) => client.shutdown().unwrap(),
+                Ok(client) => client.shutdown(),
                 Err(err) => eprintln!(
                     "======== Could not shutdown client ========\n {:?} \n ===========================",
                     err
@@ -67,18 +65,5 @@ impl Drop for TestHarness {
         }
         // In case we couldn't do a graceful shutdown above... kill the container
         drop(self.container.take())
-    }
-}
-
-pub fn clear_buffer(receiver: &Receiver<IrcMessage>) {
-    loop {
-        let recv = receiver.recv_timeout(Duration::from_secs(1));
-        match recv {
-            Ok(_) => (),
-            Err(RecvTimeoutError::Timeout) => return,
-            Err(RecvTimeoutError::Disconnected) => {
-                panic!("Receiver {:?} disconnected: {:?}", receiver, recv)
-            }
-        }
     }
 }
