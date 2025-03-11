@@ -66,7 +66,7 @@ impl IrcConnection for Connection {
                     }
                     Err(e) => {
                         match e.kind() {
-                            std::io::ErrorKind::WouldBlock => {
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => {
                                 // Timed out, return so we can do stuff
                                 Ok(None)
                             }

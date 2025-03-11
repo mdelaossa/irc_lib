@@ -2,6 +2,7 @@ use crate::connection::IrcConnection;
 use crate::message::{Command, IrcMessage, Param};
 use crate::{Config, connection::ConnectionNegotiator};
 
+use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{
@@ -75,7 +76,10 @@ impl Server {
             loop {
                 let mut conn = match connection.lock() {
                     Ok(conn) => conn,
-                    Err(_) => continue,
+                    Err(_) => {
+                        thread::sleep(Duration::from_millis(10)); // Avoid busy-waiting
+                        continue;
+                    }
                 };
 
                 let (lock, cvar) = &*Arc::clone(&self.ready);
@@ -164,8 +168,10 @@ impl Server {
                 let _ = conn.send_message(&message);
             }
             None => {
-                *ready = true;
-                signal.notify_all();
+                if !*ready {
+                    *ready = true;
+                    signal.notify_all();
+                }
             }
         }
     }
