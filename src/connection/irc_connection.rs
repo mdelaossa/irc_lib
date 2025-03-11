@@ -43,7 +43,6 @@ impl IrcConnection for Connection {
         match &mut self.socket {
             Some(stream) => {
                 let bytes = &[message.as_bytes(), b"\r\n"].concat();
-                println!("SENDING: {:?}", message);
                 stream.get_ref().write_all(bytes)?;
                 Ok(())
             }

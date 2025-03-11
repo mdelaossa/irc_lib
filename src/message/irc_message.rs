@@ -101,7 +101,6 @@ impl IrcMessage {
     }
 
     fn from_str(input: &str) -> Result<Self> {
-        println!("Parsing: {}", input);
         let mut parts = input.split_whitespace();
         let prefix = if input.starts_with(':') {
             parts.next().map(|s| s[1..].to_string()).and_then(|s| {

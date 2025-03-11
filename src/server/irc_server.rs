@@ -89,8 +89,6 @@ impl Server {
 
                 match conn.read() {
                     Ok(Some(message)) => {
-                        println!("RECEIVED: {:?}", message);
-
                         match &message {
                             IrcMessage {
                                 command: Command::Numeric(1..6),
@@ -180,14 +178,12 @@ impl Server {
             .channels
             .entry(channel_name.to_string())
             .or_insert(Channel::new(&channel_name));
-        println!("Channel: {:?}", channel);
         for param in params[3..].iter() {
             if let Param::Unknown(user) = param {
                 let user = User::new(user);
                 channel.users.insert(user.nick.clone(), user);
             }
         }
-        println!("Channel: {:?}", channel);
     }
 
     fn ping_response(connection: &mut dyn IrcConnection, message: &IrcMessage) {
