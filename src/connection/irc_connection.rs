@@ -4,8 +4,6 @@ use std::{
     time::Duration,
 };
 
-use mockall::automock;
-
 use super::error::{Error, Result};
 use crate::message::IrcMessage;
 
@@ -15,7 +13,7 @@ pub(crate) struct Connection {
     buffer: String,
 }
 
-#[automock]
+#[cfg_attr(test, mockall::automock)]
 pub trait IrcConnection: Send + core::fmt::Debug {
     fn connect(&mut self, address: String) -> Result<()>;
     fn send_message(&mut self, message: &str) -> Result<()>;
